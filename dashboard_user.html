@@ -4,14 +4,210 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>User Dashboard | Proyek Saya</title>
+    <!-- Firebase SDK v9 -->
+    <script type="module">
+        // ======================= KONFIGURASI FIREBASE =======================
+        const firebaseConfig = {
+            apiKey: "AIzaSyDrg1ltpGK_5Q85SDHVycSqMnaX1zYByLU",
+            authDomain: "toi-projects.firebaseapp.com",
+            projectId: "toi-projects",
+            storageBucket: "toi-projects.firebasestorage.app",
+            messagingSenderId: "676733316634",
+            appId: "1:676733316634:web:161451d5a16ab5346d6ba3"
+        };
+        // ====================================================================
+
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Email admin (untuk redirect)
+        const ADMIN_EMAIL = "teknikotomasiindustri.nepan@gmail.com";
+
+        // DOM elements
+        const loadingDiv = document.getElementById('loading');
+        const contentDiv = document.getElementById('content');
+        const userEmailSpan = document.getElementById('userEmail');
+        const projectsTableBody = document.getElementById('projectsTableBody');
+        const addProjectForm = document.getElementById('addProjectForm');
+        const newProjectCodeInput = document.getElementById('newProjectCode');
+        const messageDiv = document.getElementById('message');
+        const logoutBtn = document.getElementById('logoutBtn');
+
+        // Helper: tampilkan pesan
+        function showMessage(text, isError = true) {
+            messageDiv.textContent = text;
+            messageDiv.className = isError ? 'message error' : 'message success';
+            setTimeout(() => {
+                messageDiv.textContent = '';
+                messageDiv.className = 'message';
+            }, 5000);
+        }
+
+        // Muat data user dan daftar proyek
+        async function loadUserDashboard(user) {
+            try {
+                // Ambil dokumen user
+                const userDocRef = doc(db, "users", user.uid);
+                let userSnap = await getDoc(userDocRef);
+                let userData = {};
+
+                if (!userSnap.exists()) {
+                    // Buat dokumen user baru dengan array projects kosong
+                    userData = {
+                        email: user.email,
+                        projects: [],
+                        createdAt: new Date()
+                    };
+                    await setDoc(userDocRef, userData);
+                } else {
+                    userData = userSnap.data();
+                }
+
+                const projects = userData.projects || [];
+                userEmailSpan.textContent = user.email;
+
+                // Tampilkan daftar proyek dalam tabel
+                projectsTableBody.innerHTML = '';
+                if (projects.length === 0) {
+                    projectsTableBody.innerHTML = '<tr><td colspan="3" style="text-align: center;">Belum ada proyek. Tambahkan menggunakan form di bawah.</td></tr>';
+                } else {
+                    for (const code of projects) {
+                        // Ambil link dari koleksi products (jika ada)
+                        const productDocRef = doc(db, "products", code);
+                        const productSnap = await getDoc(productDocRef);
+                        const link = productSnap.exists() ? productSnap.data().link : null;
+                        const hasLink = link && link.trim() !== '';
+
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td data-label="Kode Proyek">${escapeHtml(code)}</td>
+                            <td data-label="Akses Dashboard">
+                                <button class="open-project-btn" data-link="${hasLink ? escapeHtml(link) : ''}" ${!hasLink ? 'disabled' : ''}>
+                                    ${hasLink ? '🚀 Buka Dashboard' : '🔒 Link belum tersedia'}
+                                </button>
+                            </td>
+                            <td data-label="Status">${hasLink ? '<span class="status-active">Aktif</span>' : '<span class="status-pending">Menunggu Link</span>'}</td>
+                        `;
+                        projectsTableBody.appendChild(row);
+                    }
+
+                    // Event listener untuk tombol buka project
+                    document.querySelectorAll('.open-project-btn').forEach(btn => {
+                        btn.addEventListener('click', () => {
+                            const link = btn.getAttribute('data-link');
+                            if (link) {
+                                window.open(link, '_blank');
+                            } else {
+                                showMessage('Link belum tersedia oleh admin', true);
+                            }
+                        });
+                    });
+                }
+            } catch (error) {
+                showMessage(`Gagal memuat data: ${error.message}`, true);
+                console.error(error);
+            }
+        }
+
+        // Tambah proyek baru
+        async function addProject(user, code) {
+            if (!code.trim()) {
+                showMessage('Kode proyek tidak boleh kosong', true);
+                return;
+            }
+            code = code.trim();
+            try {
+                // 1. Validasi: cek apakah kode ada di koleksi products (dikelola admin)
+                const productDocRef = doc(db, "products", code);
+                const productSnap = await getDoc(productDocRef);
+                if (!productSnap.exists()) {
+                    showMessage(`Kode proyek "${code}" tidak ditemukan. Pastikan kode sudah didaftarkan oleh admin.`, true);
+                    return;
+                }
+
+                // 2. Cek apakah user sudah memiliki kode tersebut
+                const userDocRef = doc(db, "users", user.uid);
+                const userSnap = await getDoc(userDocRef);
+                const userData = userSnap.exists() ? userSnap.data() : { projects: [] };
+                const projects = userData.projects || [];
+                if (projects.includes(code)) {
+                    showMessage(`Anda sudah memiliki proyek dengan kode "${code}".`, true);
+                    return;
+                }
+
+                // 3. Tambahkan ke array projects user
+                await updateDoc(userDocRef, {
+                    projects: arrayUnion(code)
+                });
+                showMessage(`Proyek "${code}" berhasil ditambahkan!`, false);
+                // Refresh tampilan
+                await loadUserDashboard(user);
+            } catch (error) {
+                showMessage(`Gagal menambahkan proyek: ${error.message}`, true);
+            }
+        }
+
+        // Logout
+        async function handleLogout() {
+            await signOut(auth);
+            window.location.href = 'index.html';
+        }
+
+        // Cek status autentikasi
+        onAuthStateChanged(auth, async (user) => {
+            if (user && user.email !== ADMIN_EMAIL) {
+                // User biasa, tampilkan dashboard
+                loadingDiv.style.display = 'none';
+                contentDiv.style.display = 'block';
+                await loadUserDashboard(user);
+            } else if (user && user.email === ADMIN_EMAIL) {
+                // Admin, redirect ke dashboard admin
+                window.location.href = 'dashboard_admin.html';
+            } else {
+                // Belum login, redirect ke halaman login
+                window.location.href = 'index.html';
+            }
+        });
+
+        // Event listeners
+        logoutBtn.addEventListener('click', handleLogout);
+        addProjectForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const newCode = newProjectCodeInput.value;
+            const user = auth.currentUser;
+            if (user) {
+                await addProject(user, newCode);
+                newProjectCodeInput.value = '';
+            } else {
+                showMessage('Anda belum login', true);
+            }
+        });
+
+        // Helper escape HTML
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/[&<>]/g, function(m) {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                return m;
+            });
+        }
+    </script>
+
     <style>
-        /* (CSS sama seperti sebelumnya, tidak berubah) */
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
             font-family: 'Segoe UI', system-ui, sans-serif;
         }
+
         body {
             background: linear-gradient(145deg, #e0eaf4 0%, #cfdef3 100%);
             min-height: 100vh;
@@ -20,6 +216,7 @@
             align-items: center;
             padding: 1.5rem;
         }
+
         .dashboard-card {
             background: rgba(255, 255, 255, 0.96);
             border-radius: 2rem;
@@ -29,6 +226,7 @@
             padding: 2rem;
             backdrop-filter: blur(4px);
         }
+
         h1 {
             font-size: 1.8rem;
             font-weight: 700;
@@ -41,48 +239,57 @@
             align-items: center;
             gap: 0.5rem;
         }
+
         .sub {
             color: #2c3e66cc;
             margin-bottom: 1.8rem;
             border-left: 3px solid #2c7da0;
             padding-left: 1rem;
         }
+
         .info-card {
             background: #eef2fc;
             border-radius: 1.5rem;
             padding: 1rem;
             margin-bottom: 1.5rem;
         }
+
         .info-row {
             display: flex;
             justify-content: space-between;
             margin-bottom: 0.8rem;
             flex-wrap: wrap;
         }
+
         .info-label {
             font-weight: 600;
             color: #1f3b4c;
         }
+
         .info-value {
             color: #2c7da0;
             font-weight: 500;
             word-break: break-all;
         }
+
         table {
             width: 100%;
             border-collapse: collapse;
             margin-top: 1rem;
             margin-bottom: 1.5rem;
         }
+
         th, td {
             text-align: left;
             padding: 0.75rem;
             border-bottom: 1px solid #e2e8f0;
         }
+
         th {
             background: #eef2fc;
             color: #1f3b4c;
         }
+
         button {
             background: #1f3b4c;
             color: white;
@@ -93,28 +300,35 @@
             font-weight: 600;
             transition: 0.2s;
         }
+
         button:hover:not(:disabled) {
             background: #0f2b3a;
             transform: scale(0.98);
         }
+
         button:disabled {
             background: #9aaebf;
             cursor: not-allowed;
         }
+
         .open-project-btn {
             background: #2c7da0;
         }
+
         .status-active {
             color: #27ae60;
             font-weight: 600;
         }
+
         .status-pending {
             color: #e67e22;
             font-weight: 600;
         }
+
         .form-group {
             margin: 1.2rem 0;
         }
+
         input {
             width: 100%;
             padding: 0.8rem 1rem;
@@ -123,11 +337,13 @@
             font-size: 1rem;
             background: white;
         }
+
         input:focus {
             outline: none;
             border-color: #2c7da0;
             box-shadow: 0 0 0 3px rgba(44,125,160,0.2);
         }
+
         .message {
             margin-top: 1rem;
             padding: 0.7rem;
@@ -135,44 +351,68 @@
             text-align: center;
             font-size: 0.85rem;
         }
+
         .error {
             background: #ffe6e6;
             color: #c0392b;
             border-left: 4px solid #c0392b;
         }
+
         .success {
             background: #e0f2e9;
             color: #1e6f3f;
             border-left: 4px solid #1e6f3f;
         }
+
         .logout-btn {
             background: #c0392b;
             margin-top: 1rem;
             width: 100%;
         }
+
         #loading {
             text-align: center;
             font-size: 1.2rem;
             color: #2c3e66;
         }
+
         footer {
             text-align: center;
             margin-top: 2rem;
             font-size: 0.7rem;
             color: #4a627a;
         }
+
         @media (max-width: 600px) {
-            .dashboard-card { padding: 1.5rem; }
-            .info-row { flex-direction: column; gap: 0.3rem; }
-            th, td { display: block; }
-            th { display: none; }
-            td { border-bottom: none; position: relative; padding-left: 50%; }
-            td:before { content: attr(data-label); position: absolute; left: 0.75rem; font-weight: bold; }
+            .dashboard-card {
+                padding: 1.5rem;
+            }
+            .info-row {
+                flex-direction: column;
+                gap: 0.3rem;
+            }
+            th, td {
+                display: block;
+            }
+            th {
+                display: none;
+            }
+            td {
+                border-bottom: none;
+                position: relative;
+                padding-left: 50%;
+            }
+            td:before {
+                content: attr(data-label);
+                position: absolute;
+                left: 0.75rem;
+                font-weight: bold;
+            }
         }
     </style>
 </head>
 <body>
-<div id="loading">Memeriksa otorisasi...</div>
+<div id="loading">Memuat dashboard...</div>
 <div id="content" style="display: none;">
     <div class="dashboard-card">
         <h1><i class="fas fa-chalkboard-user"></i> Dashboard User</h1>
@@ -188,7 +428,11 @@
         <h3><i class="fas fa-folder-open"></i> Daftar Proyek Saya</h3>
         <table>
             <thead>
-                <tr><th>Kode Proyek</th><th>Akses Dashboard</th><th>Status</th></tr>
+                <tr>
+                    <th>Kode Proyek</th>
+                    <th>Akses Dashboard</th>
+                    <th>Status</th>
+                </tr>
             </thead>
             <tbody id="projectsTableBody">
                 <tr><td colspan="3">Memuat...</td></tr>
@@ -213,201 +457,7 @@
     </div>
 </div>
 
-<!-- Firebase SDK v9 -->
-<script type="module">
-    // Konfigurasi Firebase (sama dengan index.html)
-    const firebaseConfig = {
-        apiKey: "AIzaSyDrg1ltpGK_5Q85SDHVycSqMnaX1zYByLU",
-        authDomain: "toi-projects.firebaseapp.com",
-        projectId: "toi-projects",
-        storageBucket: "toi-projects.firebasestorage.app",
-        messagingSenderId: "676733316634",
-        appId: "1:676733316634:web:161451d5a16ab5346d6ba3"
-    };
-
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
-    import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
-    import { getFirestore, doc, getDoc, setDoc, updateDoc, arrayUnion, collection, getDocs } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
-
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
-
-    const ADMIN_EMAIL = "teknikotomasiindustri.nepan@gmail.com";
-
-    // DOM elements
-    const loadingDiv = document.getElementById('loading');
-    const contentDiv = document.getElementById('content');
-    const userEmailSpan = document.getElementById('userEmail');
-    const projectsTableBody = document.getElementById('projectsTableBody');
-    const addProjectForm = document.getElementById('addProjectForm');
-    const newProjectCodeInput = document.getElementById('newProjectCode');
-    const messageDiv = document.getElementById('message');
-    const logoutBtn = document.getElementById('logoutBtn');
-
-    function showMessage(text, isError = true) {
-        messageDiv.textContent = text;
-        messageDiv.className = isError ? 'message error' : 'message success';
-        setTimeout(() => {
-            messageDiv.textContent = '';
-            messageDiv.className = 'message';
-        }, 5000);
-    }
-
-    async function getAllAvailableProductCodes() {
-        const usersRef = collection(db, "users");
-        const snapshot = await getDocs(usersRef);
-        const codesSet = new Set();
-        snapshot.forEach(docSnap => {
-            const userData = docSnap.data();
-            let codes = [];
-            if (userData.productCodes && Array.isArray(userData.productCodes)) {
-                codes = userData.productCodes;
-            } else if (userData.productCode && userData.productCode !== '') {
-                codes = [userData.productCode];
-            }
-            codes.forEach(code => {
-                if (code && code.trim() !== '') {
-                    codesSet.add(code.trim());
-                }
-            });
-        });
-        return codesSet;
-    }
-
-    async function loadUserDashboard(user) {
-        try {
-            const userDocRef = doc(db, "users", user.uid);
-            let userSnap = await getDoc(userDocRef);
-            let userData = {};
-            if (!userSnap.exists()) {
-                userData = { email: user.email, projects: [], createdAt: new Date() };
-                await setDoc(userDocRef, userData);
-            } else {
-                userData = userSnap.data();
-            }
-            const projects = userData.projects || [];
-            userEmailSpan.textContent = user.email;
-
-            projectsTableBody.innerHTML = '';
-            if (projects.length === 0) {
-                projectsTableBody.innerHTML = '<tr><td colspan="3" style="text-align: center;">Belum ada proyek. Tambahkan menggunakan form di bawah.</td></tr>';
-            } else {
-                for (const code of projects) {
-                    const productDocRef = doc(db, "products", code);
-                    const productSnap = await getDoc(productDocRef);
-                    const link = productSnap.exists() ? productSnap.data().link : null;
-                    const hasLink = link && link.trim() !== '';
-
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td data-label="Kode Proyek">${escapeHtml(code)}</td>
-                        <td data-label="Akses Dashboard">
-                            <button class="open-project-btn" data-code="${code}" data-link="${hasLink ? escapeHtml(link) : ''}" ${!hasLink ? 'disabled' : ''}>
-                                ${hasLink ? '🚀 Buka Dashboard' : '🔒 Link belum tersedia'}
-                            </button>
-                        </td>
-                        <td data-label="Status">${hasLink ? '<span class="status-active">Aktif</span>' : '<span class="status-pending">Menunggu Link</span>'}</td>
-                    `;
-                    projectsTableBody.appendChild(row);
-                }
-                document.querySelectorAll('.open-project-btn').forEach(btn => {
-                    btn.addEventListener('click', () => {
-                        const link = btn.getAttribute('data-link');
-                        if (link) {
-                            window.open(link, '_blank');
-                        } else {
-                            showMessage('Link belum tersedia oleh admin', true);
-                        }
-                    });
-                });
-            }
-        } catch (error) {
-            showMessage(`Gagal memuat data: ${error.message}`, true);
-            console.error(error);
-        }
-    }
-
-    async function addProject(user, code) {
-        if (!code.trim()) {
-            showMessage('Kode proyek tidak boleh kosong', true);
-            return;
-        }
-        code = code.trim();
-        try {
-            const availableCodes = await getAllAvailableProductCodes();
-            if (!availableCodes.has(code)) {
-                showMessage(`Kode proyek "${code}" tidak ditemukan. Pastikan kode sudah didaftarkan oleh admin.`, true);
-                return;
-            }
-
-            const userDocRef = doc(db, "users", user.uid);
-            const userSnap = await getDoc(userDocRef);
-            const userData = userSnap.data();
-            const projects = userData.projects || [];
-            if (projects.includes(code)) {
-                showMessage(`Anda sudah memiliki proyek dengan kode "${code}".`, true);
-                return;
-            }
-
-            await updateDoc(userDocRef, { projects: arrayUnion(code) });
-            showMessage(`Proyek "${code}" berhasil ditambahkan!`, false);
-            await loadUserDashboard(user);
-        } catch (error) {
-            showMessage(`Gagal menambahkan proyek: ${error.message}`, true);
-        }
-    }
-
-    async function handleLogout() {
-        await signOut(auth);
-        window.location.href = 'index.html';
-    }
-
-    function escapeHtml(str) {
-        if (!str) return '';
-        return str.replace(/[&<>]/g, function(m) {
-            if (m === '&') return '&amp;';
-            if (m === '<') return '&lt;';
-            if (m === '>') return '&gt;';
-            return m;
-        });
-    }
-
-    // Firebase auth state observer
-    onAuthStateChanged(auth, async (user) => {
-        console.log("Auth state changed:", user ? user.email : "null");
-        if (user) {
-            if (user.email === ADMIN_EMAIL) {
-                console.log("Admin detected, redirecting to admin dashboard");
-                window.location.href = 'dashboard_admin.html';
-                return;
-            }
-            // User biasa
-            console.log("User logged in, loading dashboard");
-            loadingDiv.style.display = 'none';
-            contentDiv.style.display = 'block';
-            await loadUserDashboard(user);
-        } else {
-            console.log("No user, redirecting to login page");
-            window.location.href = 'index.html';
-        }
-    });
-
-    addProjectForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const newCode = newProjectCodeInput.value;
-        const user = auth.currentUser;
-        if (user) {
-            await addProject(user, newCode);
-            newProjectCodeInput.value = '';
-        } else {
-            showMessage('Anda belum login', true);
-        }
-    });
-
-    logoutBtn.addEventListener('click', handleLogout);
-</script>
-
+<!-- Font Awesome -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </body>
 </html>
