@@ -10,20 +10,22 @@
         // GANTI DENGAN KONFIGURASI PROYEK ANDA DARI FIREBASE CONSOLE
         const firebaseConfig = {
             apiKey: "AIzaSyDrg1ltpGK_5Q85SDHVycSqMnaX1zYByLU",
-          authDomain: "toi-projects.firebaseapp.com",
-          projectId: "toi-projects",
-          storageBucket: "toi-projects.firebasestorage.app",
-          messagingSenderId: "676733316634",
-          appId: "1:676733316634:web:161451d5a16ab5346d6ba3"
+            authDomain: "toi-projects.firebaseapp.com",
+            projectId: "toi-projects",
+            storageBucket: "toi-projects.firebasestorage.app",
+            messagingSenderId: "676733316634",
+            appId: "1:676733316634:web:161451d5a16ab5346d6ba3"
         };
         // ====================================================================
 
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, updatePassword, signOut, onAuthStateChanged, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
+        import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
         // Inisialisasi Firebase
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
+        const db = getFirestore(app);
 
         // Email admin khusus
         const ADMIN_EMAIL = "teknikotomasiindustri.nepan@gmail.com";
@@ -134,24 +136,25 @@
                 return;
             }
             try {
-                await createUserWithEmailAndPassword(auth, email, password);
-                // Setelah registrasi berhasil, user otomatis login, langsung redirect ke dashboard user
+                // Buat akun di Firebase Authentication
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                const uid = userCredential.user.uid;
+
+                // Simpan data user ke Firestore (collection "users")
+                await setDoc(doc(db, "users", uid), {
+                    email: email,
+                    productCode: null,       // produk yang diminta (akan diisi admin)
+                    createdAt: new Date()
+                });
+
+                // Registrasi sukses, redirect ke dashboard user
                 redirectBasedOnRole(email);
-            }   catch (error) {
+            } catch (error) {
                 let errMsg = error.message;
                 if (error.code === 'auth/email-already-in-use') errMsg = 'Email sudah digunakan.';
                 if (error.code === 'auth/weak-password') errMsg = 'Password minimal 6 karakter.';
                 showMessage(errMsg, true);
             }
-            
-            import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
-            const db = getFirestore(app);
-            // ... setelah createUserWithEmailAndPassword
-            await setDoc(doc(db, "users", user.user.uid), {
-                email: email,
-                productCode: null,
-                createdAt: new Date()
-            });
         });
 
         // ======================= LUPA PASSWORD (RESET) =======================
@@ -256,6 +259,7 @@
     </script>
 
     <style>
+        /* (CSS sama seperti sebelumnya, tidak berubah) */
         * {
             margin: 0;
             padding: 0;
