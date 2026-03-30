@@ -29,6 +29,19 @@
         const ADMIN_EMAIL = "teknikotomasiindustri.nepan@gmail.com";
         const ADMIN_PASSWORD = "admin12345";
 
+        // URL dashboard berdasarkan role
+        const ADMIN_DASHBOARD_URL = "https://teknikotomasiindustrinepan.github.io/projects/dashboard_admin.html";
+        const USER_DASHBOARD_URL = "https://teknikotomasiindustrinepan.github.io/projects/dashboard_user.html";
+
+        // Fungsi redirect berdasarkan email
+        function redirectBasedOnRole(email) {
+            if (email === ADMIN_EMAIL) {
+                window.location.href = ADMIN_DASHBOARD_URL;
+            } else {
+                window.location.href = USER_DASHBOARD_URL;
+            }
+        }
+
         // DOM elements
         const loginForm = document.getElementById('loginForm');
         const signupForm = document.getElementById('signupForm');
@@ -66,34 +79,18 @@
             if (formToShow === 'change') changePwForm.classList.remove('hidden');
         }
 
-        // Update UI berdasarkan status login
+        // Update UI berdasarkan status login (tidak digunakan lagi karena setelah login akan redirect)
         function updateUI(user) {
             if (user) {
-                // User login
-                mainContainer.classList.add('logged-in');
-                userInfoDiv.classList.remove('hidden');
-                userEmailSpan.textContent = user.email;
-                const isAdmin = (user.email === ADMIN_EMAIL);
-                if (isAdmin) {
-                    adminBadge.classList.remove('hidden');
-                } else {
-                    adminBadge.classList.add('hidden');
-                }
-                showForm('login'); // sembunyikan form login/signup, tampilkan change password saja opsional
-                // Sembunyikan form login/signup/forgot, tampilkan area user
-                loginForm.classList.add('hidden');
-                signupForm.classList.add('hidden');
-                forgotForm.classList.add('hidden');
-                changePwForm.classList.add('hidden'); // default hidden
-                document.getElementById('authForms').classList.add('hidden');
-                document.getElementById('userPanel').classList.remove('hidden');
+                // Jika masih ada user yang login di halaman ini (misalnya setelah redirect gagal), kita redirect
+                redirectBasedOnRole(user.email);
             } else {
                 // User logout
                 mainContainer.classList.remove('logged-in');
                 userInfoDiv.classList.add('hidden');
                 document.getElementById('authForms').classList.remove('hidden');
                 document.getElementById('userPanel').classList.add('hidden');
-                showForm('login'); // default tampilkan login
+                showForm('login');
                 // reset form input
                 document.querySelectorAll('input').forEach(input => input.value = '');
             }
@@ -110,7 +107,8 @@
                     throw new Error('Password admin salah. Gunakan password khusus admin.');
                 }
                 await signInWithEmailAndPassword(auth, email, password);
-                showMessage(`Selamat datang, ${email}`, false);
+                // Setelah login sukses, redirect berdasarkan role
+                redirectBasedOnRole(email);
             } catch (error) {
                 let errMsg = error.message;
                 if (error.code === 'auth/user-not-found') errMsg = 'Email tidak terdaftar.';
@@ -137,7 +135,8 @@
             }
             try {
                 await createUserWithEmailAndPassword(auth, email, password);
-                showMessage('Akun berhasil dibuat! Anda sekarang login.', false);
+                // Setelah registrasi berhasil, user otomatis login, langsung redirect ke dashboard user
+                redirectBasedOnRole(email);
             } catch (error) {
                 let errMsg = error.message;
                 if (error.code === 'auth/email-already-in-use') errMsg = 'Email sudah digunakan.';
@@ -175,8 +174,7 @@
         });
 
         cancelChangePwBtn.addEventListener('click', () => {
-            showForm('login'); // kembali ke tampilan user (tidak ada form)
-            // sembunyikan form change
+            showForm('login');
             changePwForm.classList.add('hidden');
         });
 
@@ -201,14 +199,11 @@
             }
 
             try {
-                // Re-autentikasi
                 const credential = EmailAuthProvider.credential(user.email, currentPassword);
                 await reauthenticateWithCredential(user, credential);
-                // Update password
                 await updatePassword(user, newPassword);
                 showMessage('Password berhasil diubah!', false);
                 showForm('login');
-                // Kosongkan form
                 changePwForm.reset();
             } catch (error) {
                 let errMsg = error.message;
@@ -222,6 +217,7 @@
         logoutBtn.addEventListener('click', async () => {
             await signOut(auth);
             showMessage('Anda telah logout.', false);
+            // Tetap di halaman ini setelah logout
         });
 
         // ======================= NAVIGASI FORM (toggle) =======================
@@ -237,7 +233,13 @@
 
         // ======================= MONITOR STATUS AUTH =======================
         onAuthStateChanged(auth, (user) => {
-            updateUI(user);
+            if (user) {
+                // Jika sudah login dan masih berada di halaman ini, redirect
+                redirectBasedOnRole(user.email);
+            } else {
+                // User tidak login, tampilkan form login
+                updateUI(null);
+            }
         });
 
         // Tampilkan login sebagai default awal
@@ -497,7 +499,7 @@
         </form>
     </div>
 
-    <!-- Panel setelah login sukses -->
+    <!-- Panel setelah login sukses (tidak akan terlihat karena redirect) -->
     <div id="userPanel" class="hidden">
         <div id="userInfo">
             <i class="fas fa-user-circle"></i> <strong>Login sebagai:</strong><br>
