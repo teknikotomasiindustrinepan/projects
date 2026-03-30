@@ -3,11 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard | Manajemen User & Proyek</title>
+    <title>Admin Dashboard | Manajemen User & Produk</title>
     <!-- Firebase SDK v9 -->
     <script type="module">
         // ======================= KONFIGURASI FIREBASE =======================
-        // GANTI DENGAN KONFIGURASI PROYEK ANDA DARI FIREBASE CONSOLE
         const firebaseConfig = {
             apiKey: "AIzaSyDrg1ltpGK_5Q85SDHVycSqMnaX1zYByLU",
             authDomain: "toi-projects.firebaseapp.com",
@@ -20,21 +19,18 @@
 
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
         import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
-        import { getFirestore, collection, getDocs, doc, updateDoc, deleteDoc, setDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
+        import { getFirestore, collection, getDocs, doc, updateDoc, deleteDoc, setDoc, query, where, getDoc } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
 
-        // Email admin (hardcoded)
+        // Email admin
         const ADMIN_EMAIL = "teknikotomasiindustri.nepan@gmail.com";
 
         // DOM elements
         const userTableBody = document.getElementById('userTableBody');
-        const projectTableBody = document.getElementById('projectTableBody');
-        const newProductCode = document.getElementById('newProductCode');
-        const newProductLink = document.getElementById('newProductLink');
-        const addProjectBtn = document.getElementById('addProjectBtn');
+        const productTableBody = document.getElementById('productTableBody');
         const logoutBtn = document.getElementById('logoutBtn');
         const loadingDiv = document.getElementById('loading');
         const contentDiv = document.getElementById('content');
@@ -42,7 +38,7 @@
         const menuItems = document.querySelectorAll('.menu-item');
         const sections = {
             users: document.getElementById('usersSection'),
-            projects: document.getElementById('projectsSection')
+            products: document.getElementById('productsSection')
         };
 
         // Helper: tampilkan pesan
@@ -69,9 +65,9 @@
                     
                     const row = document.createElement('tr');
                     row.innerHTML = `
-                        <td data-label="Email">${email}</td>
+                        <td data-label="Email">${escapeHtml(email)}</td>
                         <td data-label="Kode Produk">
-                            <input type="text" id="product-${userId}" value="${productCode}" placeholder="Kode produk" class="product-input">
+                            <input type="text" id="product-${userId}" value="${escapeHtml(productCode)}" placeholder="Kode produk" class="product-input">
                         </td>
                         <td data-label="Aksi">
                             <button class="save-user-btn" data-id="${userId}">💾 Simpan</button>
@@ -80,7 +76,7 @@
                     `;
                     userTableBody.appendChild(row);
                 }
-                // Event listener untuk tombol simpan user
+                // Simpan user
                 document.querySelectorAll('.save-user-btn').forEach(btn => {
                     btn.addEventListener('click', async (e) => {
                         const userId = btn.getAttribute('data-id');
@@ -88,14 +84,16 @@
                         const newProduct = input.value.trim();
                         try {
                             const userRef = doc(db, "users", userId);
-                            await updateDoc(userRef, { productCode: newProduct });
+                            await updateDoc(userRef, { productCode: newProduct || null });
                             showMessage(`Produk untuk user berhasil diperbarui`, false);
+                            // Refresh daftar produk karena mungkin ada kode baru
+                            loadProducts();
                         } catch (error) {
                             showMessage(`Gagal update: ${error.message}`, true);
                         }
                     });
                 });
-                // Event listener untuk tombol hapus produk user (set productCode = null)
+                // Hapus produk user (set null)
                 document.querySelectorAll('.delete-user-product-btn').forEach(btn => {
                     btn.addEventListener('click', async (e) => {
                         const userId = btn.getAttribute('data-id');
@@ -103,10 +101,11 @@
                             try {
                                 const userRef = doc(db, "users", userId);
                                 await updateDoc(userRef, { productCode: null });
-                                // Update input di UI
                                 const input = document.getElementById(`product-${userId}`);
                                 if (input) input.value = '';
                                 showMessage(`Kode produk dihapus`, false);
+                                // Refresh daftar produk karena mungkin ada kode yang hilang
+                                loadProducts();
                             } catch (error) {
                                 showMessage(`Gagal hapus: ${error.message}`, true);
                             }
@@ -119,86 +118,79 @@
             }
         }
 
-        // ======================= LOAD PROJECTS =======================
-        async function loadProjects() {
+        // ======================= LOAD PRODUCTS (dari kode unik di users) =======================
+        async function loadProducts() {
             try {
-                const projectsRef = collection(db, "projects");
-                const q = query(projectsRef, orderBy("productCode"));
-                const snapshot = await getDocs(q);
-                projectTableBody.innerHTML = '';
-                for (const docSnap of snapshot.docs) {
-                    const projectData = docSnap.data();
-                    const productCode = projectData.productCode;
-                    const link = projectData.link || '';
-                    const docId = docSnap.id;
+                // 1. Ambil semua user, kumpulkan kode produk unik (non-null, non-empty)
+                const usersRef = collection(db, "users");
+                const snapshot = await getDocs(usersRef);
+                const productCodesSet = new Set();
+                snapshot.forEach(docSnap => {
+                    const code = docSnap.data().productCode;
+                    if (code && code.trim() !== '') {
+                        productCodesSet.add(code.trim());
+                    }
+                });
+                const productCodes = Array.from(productCodesSet).sort();
+
+                // 2. Untuk setiap kode, ambil link dari collection "products" (jika ada)
+                productTableBody.innerHTML = '';
+                for (const code of productCodes) {
+                    const productRef = doc(db, "products", code);
+                    const productSnap = await getDoc(productRef);
+                    const link = productSnap.exists() ? (productSnap.data().link || '') : '';
                     
                     const row = document.createElement('tr');
                     row.innerHTML = `
-                        <td data-label="Kode Produk">${productCode}</td>
+                        <td data-label="Kode Produk">${escapeHtml(code)}</td>
                         <td data-label="Link">
-                            <input type="url" id="link-${docId}" value="${link}" placeholder="https://..." class="link-input">
+                            <input type="url" id="link-${code}" value="${escapeHtml(link)}" placeholder="https://..." class="link-input">
                         </td>
                         <td data-label="Aksi">
-                            <button class="save-project-btn" data-id="${docId}" data-code="${productCode}">💾 Simpan</button>
-                            <button class="delete-project-btn" data-id="${docId}">🗑️ Hapus</button>
+                            <button class="save-product-btn" data-code="${code}">💾 Simpan Link</button>
+                            <button class="delete-product-btn" data-code="${code}">🗑️ Hapus Link</button>
                         </td>
                     `;
-                    projectTableBody.appendChild(row);
+                    productTableBody.appendChild(row);
                 }
-                // Event listener untuk tombol simpan proyek
-                document.querySelectorAll('.save-project-btn').forEach(btn => {
+
+                // Event listener simpan link
+                document.querySelectorAll('.save-product-btn').forEach(btn => {
                     btn.addEventListener('click', async (e) => {
-                        const docId = btn.getAttribute('data-id');
-                        const linkInput = document.getElementById(`link-${docId}`);
+                        const code = btn.getAttribute('data-code');
+                        const linkInput = document.getElementById(`link-${code}`);
                         const newLink = linkInput.value.trim();
                         try {
-                            const projectRef = doc(db, "projects", docId);
-                            await updateDoc(projectRef, { link: newLink });
-                            showMessage(`Link untuk ${btn.getAttribute('data-code')} berhasil diperbarui`, false);
+                            const productRef = doc(db, "products", code);
+                            await setDoc(productRef, { link: newLink }, { merge: true });
+                            showMessage(`Link untuk produk ${code} berhasil disimpan`, false);
                         } catch (error) {
-                            showMessage(`Gagal update: ${error.message}`, true);
+                            showMessage(`Gagal simpan link: ${error.message}`, true);
                         }
                     });
                 });
-                // Event listener untuk tombol hapus proyek
-                document.querySelectorAll('.delete-project-btn').forEach(btn => {
+
+                // Event listener hapus link
+                document.querySelectorAll('.delete-product-btn').forEach(btn => {
                     btn.addEventListener('click', async (e) => {
-                        const docId = btn.getAttribute('data-id');
-                        if (confirm('Yakin ingin menghapus proyek ini?')) {
+                        const code = btn.getAttribute('data-code');
+                        if (confirm(`Hapus link untuk produk ${code}?`)) {
                             try {
-                                await deleteDoc(doc(db, "projects", docId));
-                                showMessage('Proyek dihapus', false);
-                                loadProjects(); // refresh
+                                const productRef = doc(db, "products", code);
+                                await deleteDoc(productRef);
+                                // Kosongkan input
+                                const linkInput = document.getElementById(`link-${code}`);
+                                if (linkInput) linkInput.value = '';
+                                showMessage(`Link untuk ${code} dihapus`, false);
                             } catch (error) {
-                                showMessage(`Gagal hapus: ${error.message}`, true);
+                                showMessage(`Gagal hapus link: ${error.message}`, true);
                             }
                         }
                     });
                 });
             } catch (error) {
-                showMessage(`Gagal memuat proyek: ${error.message}`, true);
+                showMessage(`Gagal memuat produk: ${error.message}`, true);
                 console.error(error);
-            }
-        }
-
-        // ======================= TAMBAH PROYEK BARU =======================
-        async function addProject() {
-            const productCode = newProductCode.value.trim();
-            const link = newProductLink.value.trim();
-            if (!productCode) {
-                showMessage('Kode produk harus diisi', true);
-                return;
-            }
-            try {
-                // Gunakan productCode sebagai ID dokumen (unik)
-                const projectRef = doc(db, "projects", productCode);
-                await setDoc(projectRef, { productCode, link });
-                showMessage(`Proyek ${productCode} berhasil ditambahkan`, false);
-                newProductCode.value = '';
-                newProductLink.value = '';
-                loadProjects(); // refresh daftar proyek
-            } catch (error) {
-                showMessage(`Gagal menambah: ${error.message}`, true);
             }
         }
 
@@ -214,39 +206,46 @@
             if (section === 'users') {
                 menuItems[0].classList.add('active');
                 sections.users.style.display = 'block';
-                sections.projects.style.display = 'none';
+                sections.products.style.display = 'none';
             } else {
                 menuItems[1].classList.add('active');
                 sections.users.style.display = 'none';
-                sections.projects.style.display = 'block';
+                sections.products.style.display = 'block';
             }
         }
 
-        // ======================= AUTHENTICATION & LOAD DATA =======================
+        // ======================= AUTHENTICATION =======================
         onAuthStateChanged(auth, async (user) => {
             if (user && user.email === ADMIN_EMAIL) {
-                // Admin authenticated
                 loadingDiv.style.display = 'none';
                 contentDiv.style.display = 'block';
-                // Load data
                 await loadUsers();
-                await loadProjects();
-                // Show users section by default
+                await loadProducts();
                 switchSection('users');
             } else if (user) {
-                // Non-admin user, redirect to user dashboard
                 window.location.href = 'https://teknikotomasiindustrinepan.github.io/projects/dashboard_user.html';
             } else {
-                // Not logged in, redirect to login
                 window.location.href = 'index.html';
             }
         });
 
         // ======================= EVENT LISTENERS =======================
         logoutBtn.addEventListener('click', handleLogout);
-        addProjectBtn.addEventListener('click', addProject);
         menuItems[0].addEventListener('click', () => switchSection('users'));
-        menuItems[1].addEventListener('click', () => switchSection('projects'));
+        menuItems[1].addEventListener('click', () => switchSection('products'));
+
+        // Helper untuk escape HTML
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/[&<>]/g, function(m) {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                return m;
+            }).replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, function(c) {
+                return c;
+            });
+        }
     </script>
 
     <style>
@@ -262,7 +261,6 @@
             min-height: 100vh;
         }
 
-        /* Menu Bar */
         .menu-bar {
             background: #1f3b4c;
             padding: 1rem 2rem;
@@ -288,7 +286,6 @@
             background: #2c7da0;
         }
 
-        /* Container */
         .container {
             max-width: 1200px;
             margin: 2rem auto;
@@ -350,39 +347,16 @@
             transform: scale(0.98);
         }
 
-        .save-user-btn, .save-project-btn {
+        .save-user-btn, .save-product-btn {
             background: #2c7da0;
         }
 
-        .delete-user-product-btn, .delete-project-btn {
+        .delete-user-product-btn, .delete-product-btn {
             background: #c0392b;
         }
 
-        .delete-user-product-btn:hover, .delete-project-btn:hover {
+        .delete-user-product-btn:hover, .delete-product-btn:hover {
             background: #a82315;
-        }
-
-        .add-project {
-            margin-top: 2rem;
-            display: flex;
-            gap: 1rem;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-
-        .add-project input {
-            flex: 1;
-            padding: 0.7rem;
-            border: 1px solid #cbd5e1;
-            border-radius: 2rem;
-        }
-
-        .add-project button {
-            background: #27ae60;
-        }
-
-        .add-project button:hover {
-            background: #229954;
         }
 
         .logout-btn {
@@ -434,9 +408,6 @@
                 flex-direction: column;
                 align-items: center;
             }
-            .add-project {
-                flex-direction: column;
-            }
             table, thead, tbody, th, td, tr {
                 display: block;
             }
@@ -461,7 +432,7 @@
     <button id="logoutBtn" class="logout-btn">Logout</button>
     <div class="menu-bar">
         <div class="menu-item active" data-section="users">👥 Manajemen User</div>
-        <div class="menu-item" data-section="projects">📁 Manajemen Produk</div>
+        <div class="menu-item" data-section="products">📦 Manajemen Produk</div>
     </div>
     <div id="loading">Memeriksa otorisasi...</div>
     <div id="content" style="display: none;">
@@ -473,31 +444,28 @@
                     <thead>
                         <tr><th>Email / User</th><th>Kode Produk</th><th>Aksi</th></tr>
                     </thead>
-                    <tbody id="userTableBody">
-                        <!-- Data user akan diisi JS -->
-                    </tbody>
+                    <tbody id="userTableBody"></tbody>
                 </table>
             </div>
 
-            <!-- Section Proyek -->
-            <div id="projectsSection" class="section" style="display: none;">
+            <!-- Section Produk -->
+            <div id="productsSection" class="section" style="display: none;">
                 <h2>Manajemen Produk</h2>
                 <table>
                     <thead>
                         <tr><th>Kode Produk</th><th>Link</th><th>Aksi</th></tr>
                     </thead>
-                    <tbody id="projectTableBody">
-                        <!-- Data proyek akan diisi JS -->
-                    </tbody>
+                    <tbody id="productTableBody"></tbody>
                 </table>
-                <div class="add-project">
-                    <input type="text" id="newProductCode" placeholder="Kode produk baru (contoh: A123)">
-                    <input type="url" id="newProductLink" placeholder="Link tautan (https://...)">
-                    <button id="addProjectBtn">➕ Tambah Produk</button>
-                </div>
+                <p style="margin-top: 1rem; font-size: 0.8rem; color: #4a627a;">
+                    <i class="fas fa-info-circle"></i> Produk ditampilkan berdasarkan kode yang telah diinput di manajemen user.
+                </p>
             </div>
         </div>
     </div>
     <div id="message" class="message"></div>
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </body>
 </html>
