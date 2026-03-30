@@ -82,46 +82,61 @@
                     }
                     
                     const codesContainerId = `codes-${userId}`;
+                    const actionsContainerId = `actions-${userId}`;
+                    
+                    // Buat baris tabel
                     const row = document.createElement('tr');
                     row.innerHTML = `
                         <td data-label="Email">${escapeHtml(email)}</td>
                         <td data-label="Kode Produk">
-                            <div id="${codesContainerId}" class="codes-container">
-                                ${productCodes.map((code, idx) => `
-                                    <div class="code-item" data-code="${escapeHtml(code)}">
-                                        <span class="code-text">${escapeHtml(code)}</span>
-                                        <button class="edit-code-btn" data-userid="${userId}" data-oldcode="${escapeHtml(code)}">✏️ Edit</button>
-                                        <button class="delete-code-btn" data-userid="${userId}" data-code="${escapeHtml(code)}">🗑️ Hapus</button>
-                                    </div>
-                                `).join('')}
-                            </div>
+                            <div id="${codesContainerId}" class="codes-list"></div>
                             <button class="add-code-btn" data-userid="${userId}">+ Tambah Kode Baru</button>
                         </td>
                         <td data-label="Aksi">
-                            <!-- Tidak ada tombol simpan semua, karena setiap kode punya tombol sendiri -->
-                            <span style="font-size:0.8rem; color:#666;">Gunakan tombol di samping setiap kode</span>
+                            <div id="${actionsContainerId}" class="actions-list"></div>
                         </td>
                     `;
                     userTableBody.appendChild(row);
+                    
+                    const codesContainer = document.getElementById(codesContainerId);
+                    const actionsContainer = document.getElementById(actionsContainerId);
+                    
+                    // Tampilkan setiap kode produk dan tombol aksi yang sesuai
+                    productCodes.forEach((code, idx) => {
+                        // Tampilan kode produk
+                        const codeDiv = document.createElement('div');
+                        codeDiv.className = 'code-display';
+                        codeDiv.textContent = code;
+                        codesContainer.appendChild(codeDiv);
+                        
+                        // Tombol aksi untuk kode ini
+                        const actionDiv = document.createElement('div');
+                        actionDiv.className = 'action-buttons';
+                        actionDiv.innerHTML = `
+                            <button class="edit-code-btn" data-userid="${userId}" data-oldcode="${escapeHtml(code)}">✏️ Edit</button>
+                            <button class="delete-code-btn" data-userid="${userId}" data-code="${escapeHtml(code)}">🗑️ Hapus</button>
+                        `;
+                        actionsContainer.appendChild(actionDiv);
+                    });
                     
                     // Event listener untuk tombol tambah kode
                     const addBtn = row.querySelector('.add-code-btn');
                     addBtn.addEventListener('click', () => {
                         // Tampilkan form input inline untuk menambah kode baru
-                        const container = document.getElementById(codesContainerId);
-                        const newForm = document.createElement('div');
-                        newForm.className = 'code-add-form';
-                        newForm.innerHTML = `
+                        const addForm = document.createElement('div');
+                        addForm.className = 'code-add-form';
+                        addForm.innerHTML = `
                             <input type="text" class="new-code-input" placeholder="Masukkan kode produk baru">
-                            <button class="save-new-code-btn" data-userid="${userId}">Simpan</button>
-                            <button class="cancel-add-btn">Batal</button>
+                            <div class="form-buttons">
+                                <button class="save-new-code-btn">Simpan</button>
+                                <button class="cancel-add-btn">Batal</button>
+                            </div>
                         `;
-                        container.appendChild(newForm);
-                        // Fokus ke input
-                        const input = newForm.querySelector('.new-code-input');
+                        codesContainer.appendChild(addForm);
+                        const input = addForm.querySelector('.new-code-input');
                         input.focus();
-                        // Simpan
-                        const saveBtn = newForm.querySelector('.save-new-code-btn');
+                        
+                        const saveBtn = addForm.querySelector('.save-new-code-btn');
                         saveBtn.addEventListener('click', async () => {
                             const newCode = input.value.trim();
                             if (!newCode) {
@@ -134,45 +149,47 @@
                                 await updateDoc(userRef, { productCodes: newCodes });
                                 showMessage(`Kode ${newCode} berhasil ditambahkan`, false);
                                 loadUsers(); // Refresh
-                                loadProducts(); // Refresh daftar produk
+                                loadProducts();
                             } catch (error) {
                                 showMessage(`Gagal menambah: ${error.message}`, true);
                             }
                         });
-                        const cancelBtn = newForm.querySelector('.cancel-add-btn');
+                        
+                        const cancelBtn = addForm.querySelector('.cancel-add-btn');
                         cancelBtn.addEventListener('click', () => {
-                            newForm.remove();
+                            addForm.remove();
                         });
                     });
                     
-                    // Event listener untuk tombol edit (mengganti kode)
+                    // Event listener untuk tombol edit (akan diattach setelah row dibuat)
                     const editBtns = row.querySelectorAll('.edit-code-btn');
                     editBtns.forEach(btn => {
-                        btn.addEventListener('click', () => {
+                        btn.addEventListener('click', async () => {
                             const oldCode = btn.getAttribute('data-oldcode');
-                            const container = document.getElementById(codesContainerId);
-                            const codeItem = btn.closest('.code-item');
-                            // Sembunyikan tombol dan teks
-                            const codeTextSpan = codeItem.querySelector('.code-text');
-                            const editBtn = codeItem.querySelector('.edit-code-btn');
-                            const deleteBtn = codeItem.querySelector('.delete-code-btn');
-                            codeTextSpan.style.display = 'none';
-                            editBtn.style.display = 'none';
-                            deleteBtn.style.display = 'none';
+                            const codeIndex = productCodes.indexOf(oldCode);
+                            if (codeIndex === -1) return;
                             
-                            // Buat form edit
-                            const editForm = document.createElement('div');
-                            editForm.className = 'code-edit-form';
-                            editForm.innerHTML = `
+                            // Sembunyikan tombol dan tampilkan form edit di tempat aksi
+                            const actionDiv = btn.closest('.action-buttons');
+                            const codeDiv = codesContainer.children[codeIndex];
+                            
+                            // Simpan elemen asli untuk dikembalikan jika batal
+                            const originalButtons = actionDiv.innerHTML;
+                            const originalCodeText = codeDiv.textContent;
+                            
+                            // Ganti dengan form edit
+                            actionDiv.innerHTML = `
                                 <input type="text" class="edit-code-input" value="${escapeHtml(oldCode)}">
-                                <button class="save-edit-btn">Simpan</button>
-                                <button class="cancel-edit-btn">Batal</button>
+                                <div class="form-buttons">
+                                    <button class="save-edit-btn">Simpan</button>
+                                    <button class="cancel-edit-btn">Batal</button>
+                                </div>
                             `;
-                            codeItem.appendChild(editForm);
-                            const editInput = editForm.querySelector('.edit-code-input');
+                            const editInput = actionDiv.querySelector('.edit-code-input');
                             editInput.focus();
+                            
                             // Simpan perubahan
-                            const saveEditBtn = editForm.querySelector('.save-edit-btn');
+                            const saveEditBtn = actionDiv.querySelector('.save-edit-btn');
                             saveEditBtn.addEventListener('click', async () => {
                                 const newCode = editInput.value.trim();
                                 if (!newCode) {
@@ -180,13 +197,11 @@
                                     return;
                                 }
                                 try {
-                                    // Ganti kode lama dengan baru di array
-                                    const index = productCodes.indexOf(oldCode);
-                                    if (index !== -1) {
-                                        productCodes[index] = newCode;
-                                    }
+                                    // Update array di Firestore
+                                    const newCodes = [...productCodes];
+                                    newCodes[codeIndex] = newCode;
                                     const userRef = doc(db, "users", userId);
-                                    await updateDoc(userRef, { productCodes: productCodes });
+                                    await updateDoc(userRef, { productCodes: newCodes });
                                     showMessage(`Kode berhasil diubah menjadi ${newCode}`, false);
                                     loadUsers();
                                     loadProducts();
@@ -194,12 +209,38 @@
                                     showMessage(`Gagal mengubah: ${error.message}`, true);
                                 }
                             });
-                            const cancelEditBtn = editForm.querySelector('.cancel-edit-btn');
+                            
+                            const cancelEditBtn = actionDiv.querySelector('.cancel-edit-btn');
                             cancelEditBtn.addEventListener('click', () => {
-                                editForm.remove();
-                                codeTextSpan.style.display = 'inline';
-                                editBtn.style.display = 'inline-block';
-                                deleteBtn.style.display = 'inline-block';
+                                // Kembalikan tampilan awal
+                                actionDiv.innerHTML = originalButtons;
+                                codeDiv.textContent = originalCodeText;
+                                // Re-attach event listeners
+                                const newEditBtn = actionDiv.querySelector('.edit-code-btn');
+                                const newDeleteBtn = actionDiv.querySelector('.delete-code-btn');
+                                if (newEditBtn) {
+                                    newEditBtn.addEventListener('click', arguments.callee); // sederhana: reattach dengan event yang sama
+                                    // Untuk kemudahan, kita reload page? Tidak, cukup attach ulang
+                                    // Karena kita sudah punya fungsi, kita bisa panggil attachEditDeleteEvents
+                                    attachEditDeleteEvents(newEditBtn, newDeleteBtn, userId, oldCode, codeIndex, codesContainer, actionDiv);
+                                }
+                                if (newDeleteBtn) {
+                                    newDeleteBtn.addEventListener('click', async () => {
+                                        // handle delete
+                                        if (confirm(`Hapus kode "${oldCode}" untuk user ini?`)) {
+                                            try {
+                                                const newCodes = productCodes.filter(c => c !== oldCode);
+                                                const userRef = doc(db, "users", userId);
+                                                await updateDoc(userRef, { productCodes: newCodes });
+                                                showMessage(`Kode ${oldCode} dihapus`, false);
+                                                loadUsers();
+                                                loadProducts();
+                                            } catch (error) {
+                                                showMessage(`Gagal hapus: ${error.message}`, true);
+                                            }
+                                        }
+                                    });
+                                }
                             });
                         });
                     });
@@ -429,26 +470,28 @@
             color: #1f3b4c;
         }
 
-        .codes-container {
-            margin-bottom: 0.5rem;
-        }
-
-        .code-item {
+        .codes-list, .actions-list {
             display: flex;
-            align-items: center;
+            flex-direction: column;
             gap: 0.5rem;
-            margin-bottom: 0.5rem;
-            flex-wrap: wrap;
         }
 
-        .code-text {
+        .code-display {
             background: #eef2fc;
             padding: 0.3rem 0.7rem;
             border-radius: 1rem;
             font-family: monospace;
+            display: inline-block;
+            width: fit-content;
         }
 
-        .code-add-form, .code-edit-form {
+        .action-buttons {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .code-add-form {
             margin-top: 0.5rem;
             display: flex;
             gap: 0.5rem;
@@ -461,6 +504,11 @@
             border: 1px solid #cbd5e1;
             border-radius: 1rem;
             flex: 1;
+        }
+
+        .form-buttons {
+            display: flex;
+            gap: 0.5rem;
         }
 
         button {
@@ -562,8 +610,11 @@
                 left: 0.75rem;
                 font-weight: bold;
             }
-            .code-item {
-                flex-wrap: wrap;
+            .codes-list, .actions-list {
+                gap: 0.8rem;
+            }
+            .action-buttons {
+                justify-content: flex-start;
             }
         }
     </style>
@@ -580,23 +631,23 @@
             <!-- Section User -->
             <div id="usersSection" class="section">
                 <h2>Daftar User Terdaftar</h2>
-                <table>
+                 <table>
                     <thead>
-                        <tr><th>Email / User</th><th>Kode Produk</th><th>Aksi</th></tr>
+                        <tr><th>Email / User</th><th>Kode Produk</th><th>Aksi</th>\\
                     </thead>
                     <tbody id="userTableBody"></tbody>
-                </table>
+                 </table>
             </div>
 
             <!-- Section Produk -->
             <div id="productsSection" class="section" style="display: none;">
                 <h2>Manajemen Produk</h2>
-                <table>
+                 <table>
                     <thead>
-                        <tr><th>Kode Produk</th><th>Link</th><th>Aksi</th></tr>
+                        <tr><th>Kode Produk</th><th>Link</th><th>Aksi</th>\\
                     </thead>
                     <tbody id="productTableBody"></tbody>
-                </table>
+                 </table>
                 <p style="margin-top: 1rem; font-size: 0.8rem; color: #4a627a;">
                     <i class="fas fa-info-circle"></i> Produk ditampilkan berdasarkan kode yang telah diinput di manajemen user.
                 </p>
