@@ -19,7 +19,7 @@
 
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
         import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
-        import { getFirestore, collection, getDocs, doc, updateDoc, deleteDoc, setDoc, query, where, getDoc } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
+        import { getFirestore, collection, getDocs, doc, updateDoc, deleteDoc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
@@ -51,7 +51,18 @@
             }, 5000);
         }
 
-        // ======================= LOAD USERS =======================
+        // Helper: escape HTML
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/[&<>]/g, function(m) {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                return m;
+            });
+        }
+
+        // ======================= LOAD USERS (dengan multiple product codes) =======================
         async function loadUsers() {
             try {
                 const usersRef = collection(db, "users");
@@ -61,51 +72,97 @@
                     const userData = docSnap.data();
                     const userId = docSnap.id;
                     const email = userData.email || 'Email tidak tersedia';
-                    const productCode = userData.productCode || '';
+                    // Dukung field lama 'productCode' (string) dan baru 'productCodes' (array)
+                    let productCodes = [];
+                    if (userData.productCodes && Array.isArray(userData.productCodes)) {
+                        productCodes = [...userData.productCodes];
+                    } else if (userData.productCode && userData.productCode !== '') {
+                        productCodes = [userData.productCode];
+                    }
                     
+                    // Buat container untuk input kode produk
+                    const codesContainerId = `codes-${userId}`;
                     const row = document.createElement('tr');
                     row.innerHTML = `
                         <td data-label="Email">${escapeHtml(email)}</td>
                         <td data-label="Kode Produk">
-                            <input type="text" id="product-${userId}" value="${escapeHtml(productCode)}" placeholder="Kode produk" class="product-input">
+                            <div id="${codesContainerId}" class="codes-container">
+                                ${productCodes.map((code, idx) => `
+                                    <div class="code-input-group" data-index="${idx}">
+                                        <input type="text" class="product-code-input" value="${escapeHtml(code)}" placeholder="Kode produk">
+                                        <button type="button" class="remove-code-btn" data-idx="${idx}">✖</button>
+                                    </div>
+                                `).join('')}
+                            </div>
+                            <button type="button" class="add-code-btn" data-userid="${userId}">+ Tambah Kode</button>
                         </td>
                         <td data-label="Aksi">
-                            <button class="save-user-btn" data-id="${userId}">💾 Simpan</button>
-                            <button class="delete-user-product-btn" data-id="${userId}">🗑️ Hapus</button>
+                            <button class="save-user-btn" data-id="${userId}">💾 Simpan Semua</button>
+                            <button class="delete-user-product-btn" data-id="${userId}">🗑️ Hapus Semua Kode</button>
                         </td>
                     `;
                     userTableBody.appendChild(row);
+
+                    // Event listener untuk tombol tambah kode
+                    const addBtn = row.querySelector('.add-code-btn');
+                    addBtn.addEventListener('click', () => {
+                        const container = document.getElementById(codesContainerId);
+                        const newIndex = container.children.length;
+                        const newDiv = document.createElement('div');
+                        newDiv.className = 'code-input-group';
+                        newDiv.setAttribute('data-index', newIndex);
+                        newDiv.innerHTML = `
+                            <input type="text" class="product-code-input" value="" placeholder="Kode produk">
+                            <button type="button" class="remove-code-btn" data-idx="${newIndex}">✖</button>
+                        `;
+                        container.appendChild(newDiv);
+                        // Attach event hapus untuk tombol baru
+                        attachRemoveEvent(newDiv, container);
+                    });
+
+                    // Attach event hapus untuk setiap tombol hapus yang sudah ada
+                    const removeBtns = row.querySelectorAll('.remove-code-btn');
+                    removeBtns.forEach(btn => {
+                        const container = document.getElementById(codesContainerId);
+                        attachRemoveEvent(btn.closest('.code-input-group'), container);
+                    });
                 }
-                // Simpan user
+
+                // Event listener untuk tombol simpan user
                 document.querySelectorAll('.save-user-btn').forEach(btn => {
                     btn.addEventListener('click', async (e) => {
                         const userId = btn.getAttribute('data-id');
-                        const input = document.getElementById(`product-${userId}`);
-                        const newProduct = input.value.trim();
+                        const container = document.getElementById(`codes-${userId}`);
+                        const inputs = container.querySelectorAll('.product-code-input');
+                        const productCodes = Array.from(inputs)
+                            .map(input => input.value.trim())
+                            .filter(code => code !== '');
                         try {
                             const userRef = doc(db, "users", userId);
-                            await updateDoc(userRef, { productCode: newProduct || null });
-                            showMessage(`Produk untuk user berhasil diperbarui`, false);
-                            // Refresh daftar produk karena mungkin ada kode baru
-                            loadProducts();
+                            await updateDoc(userRef, { productCodes: productCodes });
+                            // Hapus field lama jika ada
+                            await updateDoc(userRef, { productCode: deleteDoc.fieldValueDelete() }).catch(() => {});
+                            showMessage(`Kode produk untuk user berhasil diperbarui`, false);
+                            loadProducts(); // Refresh daftar produk
                         } catch (error) {
                             showMessage(`Gagal update: ${error.message}`, true);
                         }
                     });
                 });
-                // Hapus produk user (set null)
+
+                // Event listener untuk tombol hapus semua kode user
                 document.querySelectorAll('.delete-user-product-btn').forEach(btn => {
                     btn.addEventListener('click', async (e) => {
                         const userId = btn.getAttribute('data-id');
-                        if (confirm('Hapus kode produk untuk user ini?')) {
+                        if (confirm('Hapus semua kode produk untuk user ini?')) {
                             try {
                                 const userRef = doc(db, "users", userId);
-                                await updateDoc(userRef, { productCode: null });
-                                const input = document.getElementById(`product-${userId}`);
-                                if (input) input.value = '';
-                                showMessage(`Kode produk dihapus`, false);
-                                // Refresh daftar produk karena mungkin ada kode yang hilang
-                                loadProducts();
+                                await updateDoc(userRef, { productCodes: [] });
+                                // Kosongkan UI
+                                const container = document.getElementById(`codes-${userId}`);
+                                container.innerHTML = '';
+                                showMessage(`Semua kode produk dihapus`, false);
+                                loadProducts(); // Refresh daftar produk
                             } catch (error) {
                                 showMessage(`Gagal hapus: ${error.message}`, true);
                             }
@@ -118,22 +175,41 @@
             }
         }
 
+        // Fungsi untuk attach event hapus pada satu group input
+        function attachRemoveEvent(groupDiv, container) {
+            const removeBtn = groupDiv.querySelector('.remove-code-btn');
+            if (removeBtn) {
+                removeBtn.addEventListener('click', () => {
+                    groupDiv.remove();
+                    // Update indeks (opsional, tidak diperlukan karena hanya digunakan untuk identifikasi)
+                });
+            }
+        }
+
         // ======================= LOAD PRODUCTS (dari kode unik di users) =======================
         async function loadProducts() {
             try {
-                // 1. Ambil semua user, kumpulkan kode produk unik (non-null, non-empty)
+                // Ambil semua user, kumpulkan kode produk unik dari array productCodes
                 const usersRef = collection(db, "users");
                 const snapshot = await getDocs(usersRef);
                 const productCodesSet = new Set();
                 snapshot.forEach(docSnap => {
-                    const code = docSnap.data().productCode;
-                    if (code && code.trim() !== '') {
-                        productCodesSet.add(code.trim());
+                    const userData = docSnap.data();
+                    let codes = [];
+                    if (userData.productCodes && Array.isArray(userData.productCodes)) {
+                        codes = userData.productCodes;
+                    } else if (userData.productCode && userData.productCode !== '') {
+                        codes = [userData.productCode];
                     }
+                    codes.forEach(code => {
+                        if (code && code.trim() !== '') {
+                            productCodesSet.add(code.trim());
+                        }
+                    });
                 });
                 const productCodes = Array.from(productCodesSet).sort();
 
-                // 2. Untuk setiap kode, ambil link dari collection "products" (jika ada)
+                // Untuk setiap kode, ambil link dari collection "products"
                 productTableBody.innerHTML = '';
                 for (const code of productCodes) {
                     const productRef = doc(db, "products", code);
@@ -178,7 +254,6 @@
                             try {
                                 const productRef = doc(db, "products", code);
                                 await deleteDoc(productRef);
-                                // Kosongkan input
                                 const linkInput = document.getElementById(`link-${code}`);
                                 if (linkInput) linkInput.value = '';
                                 showMessage(`Link untuk ${code} dihapus`, false);
@@ -233,19 +308,6 @@
         logoutBtn.addEventListener('click', handleLogout);
         menuItems[0].addEventListener('click', () => switchSection('users'));
         menuItems[1].addEventListener('click', () => switchSection('products'));
-
-        // Helper untuk escape HTML
-        function escapeHtml(str) {
-            if (!str) return '';
-            return str.replace(/[&<>]/g, function(m) {
-                if (m === '&') return '&amp;';
-                if (m === '<') return '&lt;';
-                if (m === '>') return '&gt;';
-                return m;
-            }).replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, function(c) {
-                return c;
-            });
-        }
     </script>
 
     <style>
@@ -316,6 +378,7 @@
             text-align: left;
             padding: 0.75rem;
             border-bottom: 1px solid #e2e8f0;
+            vertical-align: top;
         }
 
         th {
@@ -323,11 +386,35 @@
             color: #1f3b4c;
         }
 
-        .product-input, .link-input {
-            width: 100%;
+        .codes-container {
+            margin-bottom: 0.5rem;
+        }
+
+        .code-input-group {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+            align-items: center;
+        }
+
+        .product-code-input, .link-input {
+            flex: 1;
             padding: 0.5rem;
             border: 1px solid #cbd5e1;
             border-radius: 1rem;
+        }
+
+        .add-code-btn {
+            background: #27ae60;
+            padding: 0.3rem 0.8rem;
+            font-size: 0.8rem;
+        }
+
+        .remove-code-btn {
+            background: #c0392b;
+            padding: 0.3rem 0.6rem;
+            font-size: 0.8rem;
+            margin: 0;
         }
 
         button {
@@ -424,6 +511,9 @@
                 position: absolute;
                 left: 0.75rem;
                 font-weight: bold;
+            }
+            .code-input-group {
+                flex-wrap: wrap;
             }
         }
     </style>
