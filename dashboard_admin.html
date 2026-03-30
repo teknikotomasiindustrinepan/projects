@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard | Hello World ADMIN </title>
-    <!-- Firebase SDK v9 (modular) -->
+    <title>Admin Dashboard | Manajemen User & Proyek</title>
+    <!-- Firebase SDK v9 -->
     <script type="module">
         // ======================= KONFIGURASI FIREBASE =======================
-        // GANTI DENGAN KONFIGURASI PROYEK ANDA YANG SAMA DENGAN INDEX.HTML
+        // SAMA DENGAN KONFIGURASI DI INDEX.HTML
         const firebaseConfig = {
             apiKey: "AIzaSyDrg1ltpGK_5Q85SDHVycSqMnaX1zYByLU",
             authDomain: "toi-projects.firebaseapp.com",
@@ -20,41 +20,211 @@
 
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
         import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
+        import { getFirestore, collection, getDocs, doc, updateDoc, deleteDoc, setDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
-        // Inisialisasi Firebase
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
+        const db = getFirestore(app);
 
-        // Elemen DOM
+        // Email admin (hardcoded)
+        const ADMIN_EMAIL = "teknikotomasiindustri.nepan@gmail.com";
+
+        // DOM elements
+        const userTableBody = document.getElementById('userTableBody');
+        const projectTableBody = document.getElementById('projectTableBody');
+        const newProductCode = document.getElementById('newProductCode');
+        const newProductLink = document.getElementById('newProductLink');
+        const addProjectBtn = document.getElementById('addProjectBtn');
         const logoutBtn = document.getElementById('logoutBtn');
-        const userEmailSpan = document.getElementById('userEmail');
         const loadingDiv = document.getElementById('loading');
         const contentDiv = document.getElementById('content');
+        const messageDiv = document.getElementById('message');
+        const menuItems = document.querySelectorAll('.menu-item');
+        const sections = {
+            users: document.getElementById('usersSection'),
+            projects: document.getElementById('projectsSection')
+        };
 
-        // Cek status autentikasi
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                // User login: tampilkan konten
-                loadingDiv.style.display = 'none';
-                contentDiv.style.display = 'block';
-                userEmailSpan.textContent = user.email;
-            } else {
-                // Tidak ada user: redirect ke halaman login (index.html)
-                window.location.href = 'index.html';
+        // Helper: tampilkan pesan
+        function showMessage(text, isError = true) {
+            messageDiv.textContent = text;
+            messageDiv.className = isError ? 'message error' : 'message success';
+            setTimeout(() => {
+                messageDiv.textContent = '';
+                messageDiv.className = 'message';
+            }, 5000);
+        }
+
+        // Load semua user dari Firestore collection "users"
+        async function loadUsers() {
+            try {
+                const usersRef = collection(db, "users");
+                const snapshot = await getDocs(usersRef);
+                userTableBody.innerHTML = '';
+                for (const docSnap of snapshot.docs) {
+                    const userData = docSnap.data();
+                    const userId = docSnap.id;
+                    const email = userData.email || 'Email tidak tersedia';
+                    const productCode = userData.productCode || '';
+                    
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${email}</td>
+                        <td>
+                            <input type="text" id="product-${userId}" value="${productCode}" placeholder="Kode produk" class="product-input">
+                        </td>
+                        <td>
+                            <button class="save-user-btn" data-id="${userId}">Simpan</button>
+                        </td>
+                    `;
+                    userTableBody.appendChild(row);
+                }
+                // Attach event listeners to save buttons
+                document.querySelectorAll('.save-user-btn').forEach(btn => {
+                    btn.addEventListener('click', async (e) => {
+                        const userId = btn.getAttribute('data-id');
+                        const input = document.getElementById(`product-${userId}`);
+                        const newProduct = input.value.trim();
+                        try {
+                            const userRef = doc(db, "users", userId);
+                            await updateDoc(userRef, { productCode: newProduct });
+                            showMessage(`Produk untuk user ${userId} berhasil diperbarui`, false);
+                        } catch (error) {
+                            showMessage(`Gagal update: ${error.message}`, true);
+                        }
+                    });
+                });
+            } catch (error) {
+                showMessage(`Gagal memuat user: ${error.message}`, true);
             }
-        });
+        }
+
+        // Load semua proyek dari Firestore collection "projects"
+        async function loadProjects() {
+            try {
+                const projectsRef = collection(db, "projects");
+                const q = query(projectsRef, orderBy("productCode"));
+                const snapshot = await getDocs(q);
+                projectTableBody.innerHTML = '';
+                for (const docSnap of snapshot.docs) {
+                    const projectData = docSnap.data();
+                    const productCode = projectData.productCode;
+                    const link = projectData.link || '';
+                    const docId = docSnap.id;
+                    
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${productCode}</td>
+                        <td>
+                            <input type="url" id="link-${docId}" value="${link}" placeholder="https://..." class="link-input">
+                        </td>
+                        <td>
+                            <button class="save-project-btn" data-id="${docId}" data-code="${productCode}">Simpan</button>
+                            <button class="delete-project-btn" data-id="${docId}">Hapus</button>
+                        </td>
+                    `;
+                    projectTableBody.appendChild(row);
+                }
+                // Event listeners for save and delete
+                document.querySelectorAll('.save-project-btn').forEach(btn => {
+                    btn.addEventListener('click', async (e) => {
+                        const docId = btn.getAttribute('data-id');
+                        const linkInput = document.getElementById(`link-${docId}`);
+                        const newLink = linkInput.value.trim();
+                        try {
+                            const projectRef = doc(db, "projects", docId);
+                            await updateDoc(projectRef, { link: newLink });
+                            showMessage(`Link untuk ${btn.getAttribute('data-code')} berhasil diperbarui`, false);
+                        } catch (error) {
+                            showMessage(`Gagal update: ${error.message}`, true);
+                        }
+                    });
+                });
+                document.querySelectorAll('.delete-project-btn').forEach(btn => {
+                    btn.addEventListener('click', async (e) => {
+                        const docId = btn.getAttribute('data-id');
+                        if (confirm('Yakin ingin menghapus proyek ini?')) {
+                            try {
+                                await deleteDoc(doc(db, "projects", docId));
+                                showMessage('Proyek dihapus', false);
+                                loadProjects(); // refresh
+                            } catch (error) {
+                                showMessage(`Gagal hapus: ${error.message}`, true);
+                            }
+                        }
+                    });
+                });
+            } catch (error) {
+                showMessage(`Gagal memuat proyek: ${error.message}`, true);
+            }
+        }
+
+        // Tambah proyek baru
+        async function addProject() {
+            const productCode = newProductCode.value.trim();
+            const link = newProductLink.value.trim();
+            if (!productCode) {
+                showMessage('Kode produk harus diisi', true);
+                return;
+            }
+            try {
+                // Gunakan productCode sebagai ID dokumen untuk mencegah duplikat
+                const projectRef = doc(db, "projects", productCode);
+                await setDoc(projectRef, { productCode, link });
+                showMessage(`Proyek ${productCode} berhasil ditambahkan`, false);
+                newProductCode.value = '';
+                newProductLink.value = '';
+                loadProjects();
+            } catch (error) {
+                showMessage(`Gagal menambah: ${error.message}`, true);
+            }
+        }
 
         // Logout
-        logoutBtn.addEventListener('click', async () => {
-            try {
-                await signOut(auth);
-                // Redirect ke halaman login
+        async function handleLogout() {
+            await signOut(auth);
+            window.location.href = 'index.html';
+        }
+
+        // Menu switching
+        function switchSection(section) {
+            menuItems.forEach(item => item.classList.remove('active'));
+            if (section === 'users') {
+                menuItems[0].classList.add('active');
+                sections.users.style.display = 'block';
+                sections.projects.style.display = 'none';
+            } else {
+                menuItems[1].classList.add('active');
+                sections.users.style.display = 'none';
+                sections.projects.style.display = 'block';
+            }
+        }
+
+        // Check admin auth
+        onAuthStateChanged(auth, async (user) => {
+            if (user && user.email === ADMIN_EMAIL) {
+                // Admin authenticated
+                loadingDiv.style.display = 'none';
+                contentDiv.style.display = 'block';
+                // Load data
+                await loadUsers();
+                await loadProjects();
+                // Show users section by default
+                switchSection('users');
+            } else if (user) {
+                // Non-admin user, redirect to user dashboard
+                window.location.href = 'https://teknikotomasiindustrinepan.github.io/projects/dashboard_user.html';
+            } else {
+                // Not logged in, redirect to login
                 window.location.href = 'index.html';
-            } catch (error) {
-                console.error('Logout gagal:', error);
-                alert('Terjadi kesalahan saat logout.');
             }
         });
+
+        // Event listeners
+        logoutBtn.addEventListener('click', handleLogout);
+        addProjectBtn.addEventListener('click', addProject);
+        menuItems[0].addEventListener('click', () => switchSection('users'));
+        menuItems[1].addEventListener('click', () => switchSection('projects'));
     </script>
 
     <style>
@@ -66,106 +236,246 @@
         }
 
         body {
-            min-height: 100vh;
             background: linear-gradient(145deg, #e0eaf4 0%, #cfdef3 100%);
+            min-height: 100vh;
+        }
+
+        /* Menu Bar */
+        .menu-bar {
+            background: #1f3b4c;
+            padding: 1rem 2rem;
             display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 1.5rem;
+            gap: 2rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
 
-        .card {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(8px);
+        .menu-item {
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            padding: 0.5rem 1rem;
             border-radius: 2rem;
-            box-shadow: 0 20px 35px -12px rgba(0, 0, 0, 0.2);
-            padding: 2rem;
-            width: 100%;
-            max-width: 500px;
-            text-align: center;
-            border: 1px solid rgba(255,255,255,0.6);
+            transition: 0.2s;
         }
 
-        h1 {
-            font-size: 2.5rem;
-            background: linear-gradient(135deg, #1A2A4F, #2C3E66);
-            background-clip: text;
-            -webkit-background-clip: text;
-            color: transparent;
-            margin-bottom: 1rem;
+        .menu-item:hover {
+            background: #2c5a74;
         }
 
-        .user-info {
-            background: #eef2fc;
-            padding: 0.8rem;
+        .menu-item.active {
+            background: #2c7da0;
+        }
+
+        /* Container */
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 1.5rem;
+        }
+
+        .section {
+            background: rgba(255, 255, 255, 0.96);
             border-radius: 1.5rem;
-            margin: 1.5rem 0;
-            font-size: 0.9rem;
-            color: #1e2f41;
+            padding: 1.5rem;
+            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1);
         }
 
-        .user-info i {
-            margin-right: 6px;
+        h2 {
+            color: #1f3b4c;
+            margin-bottom: 1rem;
+            border-left: 5px solid #2c7da0;
+            padding-left: 1rem;
         }
 
-        .btn-logout {
-            background: #c0392b;
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+
+        th, td {
+            text-align: left;
+            padding: 0.75rem;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        th {
+            background: #eef2fc;
+            color: #1f3b4c;
+        }
+
+        .product-input, .link-input {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #cbd5e1;
+            border-radius: 1rem;
+        }
+
+        button {
+            background: #1f3b4c;
             color: white;
             border: none;
-            padding: 0.8rem 1.5rem;
+            padding: 0.5rem 1rem;
             border-radius: 2rem;
-            font-weight: bold;
-            font-size: 1rem;
             cursor: pointer;
+            font-weight: 600;
             transition: 0.2s;
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
         }
 
-        .btn-logout:hover {
-            background: #a82315;
+        button:hover {
+            background: #0f2b3a;
             transform: scale(0.98);
         }
 
+        .save-user-btn, .save-project-btn {
+            background: #2c7da0;
+        }
+
+        .delete-project-btn {
+            background: #c0392b;
+            margin-left: 0.5rem;
+        }
+
+        .delete-project-btn:hover {
+            background: #a82315;
+        }
+
+        .add-project {
+            margin-top: 2rem;
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .add-project input {
+            flex: 1;
+            padding: 0.7rem;
+            border: 1px solid #cbd5e1;
+            border-radius: 2rem;
+        }
+
+        .add-project button {
+            background: #27ae60;
+        }
+
+        .add-project button:hover {
+            background: #229954;
+        }
+
+        .logout-btn {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            background: #c0392b;
+            z-index: 100;
+        }
+
+        .logout-btn:hover {
+            background: #a82315;
+        }
+
         #loading {
-            font-size: 1rem;
+            text-align: center;
+            margin-top: 2rem;
+            font-size: 1.2rem;
             color: #2c3e66;
         }
 
-        #content {
-            display: none;
+        .message {
+            position: fixed;
+            bottom: 1rem;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 0.7rem 1.5rem;
+            border-radius: 2rem;
+            font-size: 0.9rem;
+            z-index: 1000;
+            background: white;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
         }
 
-        footer {
-            margin-top: 2rem;
-            font-size: 0.7rem;
-            color: #4a627a;
+        .error {
+            background: #ffe6e6;
+            color: #c0392b;
+            border-left: 4px solid #c0392b;
+        }
+
+        .success {
+            background: #e0f2e9;
+            color: #1e6f3f;
+            border-left: 4px solid #1e6f3f;
+        }
+
+        @media (max-width: 768px) {
+            .menu-bar {
+                flex-direction: column;
+                align-items: center;
+            }
+            .add-project {
+                flex-direction: column;
+            }
+            table, thead, tbody, th, td, tr {
+                display: block;
+            }
+            th {
+                display: none;
+            }
+            td {
+                border-bottom: none;
+                position: relative;
+                padding-left: 50%;
+            }
+            td:before {
+                content: attr(data-label);
+                position: absolute;
+                left: 0.75rem;
+                font-weight: bold;
+            }
         }
     </style>
 </head>
 <body>
-<div class="card">
-    <div id="loading">
-        <i class="fas fa-spinner fa-pulse"></i> Memeriksa sesi...
+    <button id="logoutBtn" class="logout-btn">Logout</button>
+    <div class="menu-bar">
+        <div class="menu-item active" data-section="users">👥 Manajemen User</div>
+        <div class="menu-item" data-section="projects">📁 Manajemen Proyek</div>
     </div>
+    <div id="loading">Memeriksa otorisasi...</div>
+    <div id="content" style="display: none;">
+        <div class="container">
+            <!-- Section User -->
+            <div id="usersSection" class="section">
+                <h2>Daftar User Terdaftar</h2>
+                <table>
+                    <thead>
+                        <tr><th>Email</th><th>Kode Produk yang Diminta</th><th>Aksi</th></tr>
+                    </thead>
+                    <tbody id="userTableBody">
+                        <!-- Data user akan diisi JS -->
+                    </tbody>
+                </table>
+            </div>
 
-    <div id="content">
-        <h1>Hello World 🌍</h1>
-        <div class="user-info">
-            <i class="fas fa-user-circle"></i> Anda login sebagai:<br>
-            <strong id="userEmail"></strong>
+            <!-- Section Proyek -->
+            <div id="projectsSection" class="section" style="display: none;">
+                <h2>Daftar Proyek (Kode Produk & Link)</h2>
+                <table>
+                    <thead>
+                        <tr><th>Kode Produk</th><th>Link Tautan</th><th>Aksi</th></tr>
+                    </thead>
+                    <tbody id="projectTableBody">
+                        <!-- Data proyek akan diisi JS -->
+                    </tbody>
+                </table>
+                <div class="add-project">
+                    <input type="text" id="newProductCode" placeholder="Kode produk baru (contoh: A123)">
+                    <input type="url" id="newProductLink" placeholder="Link tautan (https://...)">
+                    <button id="addProjectBtn">Tambah Proyek</button>
+                </div>
+            </div>
         </div>
-        <button id="logoutBtn" class="btn-logout">
-            <i class="fas fa-sign-out-alt"></i> Logout
-        </button>
     </div>
-    <footer>
-        <i class="fas fa-firebase"></i> Halaman terlindungi
-    </footer>
-</div>
-
-<!-- Font Awesome -->
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <div id="message" class="message"></div>
 </body>
 </html>
