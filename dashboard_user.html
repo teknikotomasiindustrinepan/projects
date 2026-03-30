@@ -74,7 +74,7 @@
                 // Tampilkan daftar proyek dalam tabel
                 projectsTableBody.innerHTML = '';
                 if (projects.length === 0) {
-                    projectsTableBody.innerHTML = '<tr><td colspan="3" style="text-align: center;">Belum ada proyek. Tambahkan menggunakan form di bawah.</td></tr>';
+                    projectsTableBody.innerHTML = ' tr><td colspan="3" style="text-align: center;">Belum ada proyek. Tambahkan menggunakan form di bawah.</td></tr>';
                 } else {
                     for (const code of projects) {
                         // Ambil link dari koleksi products (jika ada)
@@ -96,12 +96,12 @@
                         projectsTableBody.appendChild(row);
                     }
 
-                    // Event listener untuk tombol buka project
+                    // Event listener untuk tombol buka project – redirect ke link (tidak buka tab baru)
                     document.querySelectorAll('.open-project-btn').forEach(btn => {
                         btn.addEventListener('click', () => {
                             const link = btn.getAttribute('data-link');
                             if (link) {
-                                window.open(link, '_blank');
+                                window.location.href = link;  // redirect halaman saat ini
                             } else {
                                 showMessage('Link belum tersedia oleh admin', true);
                             }
@@ -201,6 +201,7 @@
     </script>
 
     <style>
+        /* (CSS sama seperti sebelumnya) */
         * {
             margin: 0;
             padding: 0;
