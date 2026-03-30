@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard | Hello World USER </title>
+    <!-- Firebase SDK v9 (modular) -->
+    <script type="module">
+        // ======================= KONFIGURASI FIREBASE =======================
+        // GANTI DENGAN KONFIGURASI PROYEK ANDA YANG SAMA DENGAN INDEX.HTML
+        const firebaseConfig = {
+            apiKey: "AIzaSyDrg1ltpGK_5Q85SDHVycSqMnaX1zYByLU",
+            authDomain: "toi-projects.firebaseapp.com",
+            projectId: "toi-projects",
+            storageBucket: "toi-projects.firebasestorage.app",
+            messagingSenderId: "676733316634",
+            appId: "1:676733316634:web:161451d5a16ab5346d6ba3"
+        };
+        // ====================================================================
+
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
+
+        // Inisialisasi Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+
+        // Elemen DOM
+        const logoutBtn = document.getElementById('logoutBtn');
+        const userEmailSpan = document.getElementById('userEmail');
+        const loadingDiv = document.getElementById('loading');
+        const contentDiv = document.getElementById('content');
+
+        // Cek status autentikasi
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                // User login: tampilkan konten
+                loadingDiv.style.display = 'none';
+                contentDiv.style.display = 'block';
+                userEmailSpan.textContent = user.email;
+            } else {
+                // Tidak ada user: redirect ke halaman login (index.html)
+                window.location.href = 'index.html';
+            }
+        });
+
+        // Logout
+        logoutBtn.addEventListener('click', async () => {
+            try {
+                await signOut(auth);
+                // Redirect ke halaman login
+                window.location.href = 'index.html';
+            } catch (error) {
+                console.error('Logout gagal:', error);
+                alert('Terjadi kesalahan saat logout.');
+            }
+        });
+    </script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+        }
+
+        body {
+            min-height: 100vh;
+            background: linear-gradient(145deg, #e0eaf4 0%, #cfdef3 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(8px);
+            border-radius: 2rem;
+            box-shadow: 0 20px 35px -12px rgba(0, 0, 0, 0.2);
+            padding: 2rem;
+            width: 100%;
+            max-width: 500px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.6);
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(135deg, #1A2A4F, #2C3E66);
+            background-clip: text;
+            -webkit-background-clip: text;
+            color: transparent;
+            margin-bottom: 1rem;
+        }
+
+        .user-info {
+            background: #eef2fc;
+            padding: 0.8rem;
+            border-radius: 1.5rem;
+            margin: 1.5rem 0;
+            font-size: 0.9rem;
+            color: #1e2f41;
+        }
+
+        .user-info i {
+            margin-right: 6px;
+        }
+
+        .btn-logout {
+            background: #c0392b;
+            color: white;
+            border: none;
+            padding: 0.8rem 1.5rem;
+            border-radius: 2rem;
+            font-weight: bold;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn-logout:hover {
+            background: #a82315;
+            transform: scale(0.98);
+        }
+
+        #loading {
+            font-size: 1rem;
+            color: #2c3e66;
+        }
+
+        #content {
+            display: none;
+        }
+
+        footer {
+            margin-top: 2rem;
+            font-size: 0.7rem;
+            color: #4a627a;
+        }
+    </style>
+</head>
+<body>
+<div class="card">
+    <div id="loading">
+        <i class="fas fa-spinner fa-pulse"></i> Memeriksa sesi...
+    </div>
+
+    <div id="content">
+        <h1>Hello World 🌍</h1>
+        <div class="user-info">
+            <i class="fas fa-user-circle"></i> Anda login sebagai:<br>
+            <strong id="userEmail"></strong>
+        </div>
+        <button id="logoutBtn" class="btn-logout">
+            <i class="fas fa-sign-out-alt"></i> Logout
+        </button>
+    </div>
+    <footer>
+        <i class="fas fa-firebase"></i> Halaman terlindungi
+    </footer>
+</div>
+
+<!-- Font Awesome -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</body>
+</html>
