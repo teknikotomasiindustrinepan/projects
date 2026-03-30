@@ -7,7 +7,7 @@
     <!-- Firebase SDK v9 -->
     <script type="module">
         // ======================= KONFIGURASI FIREBASE =======================
-        // SAMA DENGAN KONFIGURASI DI INDEX.HTML
+        // GANTI DENGAN KONFIGURASI PROYEK ANDA DARI FIREBASE CONSOLE
         const firebaseConfig = {
             apiKey: "AIzaSyDrg1ltpGK_5Q85SDHVycSqMnaX1zYByLU",
             authDomain: "toi-projects.firebaseapp.com",
@@ -55,7 +55,7 @@
             }, 5000);
         }
 
-        // Load semua user dari Firestore collection "users"
+        // ======================= LOAD USERS =======================
         async function loadUsers() {
             try {
                 const usersRef = collection(db, "users");
@@ -69,17 +69,18 @@
                     
                     const row = document.createElement('tr');
                     row.innerHTML = `
-                        <td>${email}</td>
-                        <td>
+                        <td data-label="Email">${email}</td>
+                        <td data-label="Kode Produk">
                             <input type="text" id="product-${userId}" value="${productCode}" placeholder="Kode produk" class="product-input">
                         </td>
-                        <td>
-                            <button class="save-user-btn" data-id="${userId}">Simpan</button>
+                        <td data-label="Aksi">
+                            <button class="save-user-btn" data-id="${userId}">💾 Simpan</button>
+                            <button class="delete-user-product-btn" data-id="${userId}">🗑️ Hapus</button>
                         </td>
                     `;
                     userTableBody.appendChild(row);
                 }
-                // Attach event listeners to save buttons
+                // Event listener untuk tombol simpan user
                 document.querySelectorAll('.save-user-btn').forEach(btn => {
                     btn.addEventListener('click', async (e) => {
                         const userId = btn.getAttribute('data-id');
@@ -88,18 +89,37 @@
                         try {
                             const userRef = doc(db, "users", userId);
                             await updateDoc(userRef, { productCode: newProduct });
-                            showMessage(`Produk untuk user ${userId} berhasil diperbarui`, false);
+                            showMessage(`Produk untuk user berhasil diperbarui`, false);
                         } catch (error) {
                             showMessage(`Gagal update: ${error.message}`, true);
                         }
                     });
                 });
+                // Event listener untuk tombol hapus produk user (set productCode = null)
+                document.querySelectorAll('.delete-user-product-btn').forEach(btn => {
+                    btn.addEventListener('click', async (e) => {
+                        const userId = btn.getAttribute('data-id');
+                        if (confirm('Hapus kode produk untuk user ini?')) {
+                            try {
+                                const userRef = doc(db, "users", userId);
+                                await updateDoc(userRef, { productCode: null });
+                                // Update input di UI
+                                const input = document.getElementById(`product-${userId}`);
+                                if (input) input.value = '';
+                                showMessage(`Kode produk dihapus`, false);
+                            } catch (error) {
+                                showMessage(`Gagal hapus: ${error.message}`, true);
+                            }
+                        }
+                    });
+                });
             } catch (error) {
                 showMessage(`Gagal memuat user: ${error.message}`, true);
+                console.error(error);
             }
         }
 
-        // Load semua proyek dari Firestore collection "projects"
+        // ======================= LOAD PROJECTS =======================
         async function loadProjects() {
             try {
                 const projectsRef = collection(db, "projects");
@@ -114,18 +134,18 @@
                     
                     const row = document.createElement('tr');
                     row.innerHTML = `
-                        <td>${productCode}</td>
-                        <td>
+                        <td data-label="Kode Produk">${productCode}</td>
+                        <td data-label="Link">
                             <input type="url" id="link-${docId}" value="${link}" placeholder="https://..." class="link-input">
                         </td>
-                        <td>
-                            <button class="save-project-btn" data-id="${docId}" data-code="${productCode}">Simpan</button>
-                            <button class="delete-project-btn" data-id="${docId}">Hapus</button>
+                        <td data-label="Aksi">
+                            <button class="save-project-btn" data-id="${docId}" data-code="${productCode}">💾 Simpan</button>
+                            <button class="delete-project-btn" data-id="${docId}">🗑️ Hapus</button>
                         </td>
                     `;
                     projectTableBody.appendChild(row);
                 }
-                // Event listeners for save and delete
+                // Event listener untuk tombol simpan proyek
                 document.querySelectorAll('.save-project-btn').forEach(btn => {
                     btn.addEventListener('click', async (e) => {
                         const docId = btn.getAttribute('data-id');
@@ -140,6 +160,7 @@
                         }
                     });
                 });
+                // Event listener untuk tombol hapus proyek
                 document.querySelectorAll('.delete-project-btn').forEach(btn => {
                     btn.addEventListener('click', async (e) => {
                         const docId = btn.getAttribute('data-id');
@@ -156,10 +177,11 @@
                 });
             } catch (error) {
                 showMessage(`Gagal memuat proyek: ${error.message}`, true);
+                console.error(error);
             }
         }
 
-        // Tambah proyek baru
+        // ======================= TAMBAH PROYEK BARU =======================
         async function addProject() {
             const productCode = newProductCode.value.trim();
             const link = newProductLink.value.trim();
@@ -168,25 +190,25 @@
                 return;
             }
             try {
-                // Gunakan productCode sebagai ID dokumen untuk mencegah duplikat
+                // Gunakan productCode sebagai ID dokumen (unik)
                 const projectRef = doc(db, "projects", productCode);
                 await setDoc(projectRef, { productCode, link });
                 showMessage(`Proyek ${productCode} berhasil ditambahkan`, false);
                 newProductCode.value = '';
                 newProductLink.value = '';
-                loadProjects();
+                loadProjects(); // refresh daftar proyek
             } catch (error) {
                 showMessage(`Gagal menambah: ${error.message}`, true);
             }
         }
 
-        // Logout
+        // ======================= LOGOUT =======================
         async function handleLogout() {
             await signOut(auth);
             window.location.href = 'index.html';
         }
 
-        // Menu switching
+        // ======================= MENU SWITCHING =======================
         function switchSection(section) {
             menuItems.forEach(item => item.classList.remove('active'));
             if (section === 'users') {
@@ -200,7 +222,7 @@
             }
         }
 
-        // Check admin auth
+        // ======================= AUTHENTICATION & LOAD DATA =======================
         onAuthStateChanged(auth, async (user) => {
             if (user && user.email === ADMIN_EMAIL) {
                 // Admin authenticated
@@ -220,7 +242,7 @@
             }
         });
 
-        // Event listeners
+        // ======================= EVENT LISTENERS =======================
         logoutBtn.addEventListener('click', handleLogout);
         addProjectBtn.addEventListener('click', addProject);
         menuItems[0].addEventListener('click', () => switchSection('users'));
@@ -320,6 +342,7 @@
             cursor: pointer;
             font-weight: 600;
             transition: 0.2s;
+            margin: 0 0.25rem;
         }
 
         button:hover {
@@ -331,12 +354,11 @@
             background: #2c7da0;
         }
 
-        .delete-project-btn {
+        .delete-user-product-btn, .delete-project-btn {
             background: #c0392b;
-            margin-left: 0.5rem;
         }
 
-        .delete-project-btn:hover {
+        .delete-user-product-btn:hover, .delete-project-btn:hover {
             background: #a82315;
         }
 
@@ -439,7 +461,7 @@
     <button id="logoutBtn" class="logout-btn">Logout</button>
     <div class="menu-bar">
         <div class="menu-item active" data-section="users">👥 Manajemen User</div>
-        <div class="menu-item" data-section="projects">📁 Manajemen Proyek</div>
+        <div class="menu-item" data-section="projects">📁 Manajemen Produk</div>
     </div>
     <div id="loading">Memeriksa otorisasi...</div>
     <div id="content" style="display: none;">
@@ -449,7 +471,7 @@
                 <h2>Daftar User Terdaftar</h2>
                 <table>
                     <thead>
-                        <tr><th>Email</th><th>Kode Produk yang Diminta</th><th>Aksi</th></tr>
+                        <tr><th>Email / User</th><th>Kode Produk</th><th>Aksi</th></tr>
                     </thead>
                     <tbody id="userTableBody">
                         <!-- Data user akan diisi JS -->
@@ -459,10 +481,10 @@
 
             <!-- Section Proyek -->
             <div id="projectsSection" class="section" style="display: none;">
-                <h2>Daftar Proyek (Kode Produk & Link)</h2>
+                <h2>Manajemen Produk</h2>
                 <table>
                     <thead>
-                        <tr><th>Kode Produk</th><th>Link Tautan</th><th>Aksi</th></tr>
+                        <tr><th>Kode Produk</th><th>Link</th><th>Aksi</th></tr>
                     </thead>
                     <tbody id="projectTableBody">
                         <!-- Data proyek akan diisi JS -->
@@ -471,7 +493,7 @@
                 <div class="add-project">
                     <input type="text" id="newProductCode" placeholder="Kode produk baru (contoh: A123)">
                     <input type="url" id="newProductLink" placeholder="Link tautan (https://...)">
-                    <button id="addProjectBtn">Tambah Proyek</button>
+                    <button id="addProjectBtn">➕ Tambah Produk</button>
                 </div>
             </div>
         </div>
