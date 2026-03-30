@@ -3,11 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard | Hello World USER </title>
-    <!-- Firebase SDK v9 (modular) -->
+    <title>User Dashboard | Proyek Saya</title>
+    <!-- Firebase SDK v9 -->
     <script type="module">
         // ======================= KONFIGURASI FIREBASE =======================
-        // GANTI DENGAN KONFIGURASI PROYEK ANDA YANG SAMA DENGAN INDEX.HTML
         const firebaseConfig = {
             apiKey: "AIzaSyDrg1ltpGK_5Q85SDHVycSqMnaX1zYByLU",
             authDomain: "toi-projects.firebaseapp.com",
@@ -20,41 +19,173 @@
 
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
         import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, updateDoc, arrayUnion, arrayRemove } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
-        // Inisialisasi Firebase
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
+        const db = getFirestore(app);
 
-        // Elemen DOM
-        const logoutBtn = document.getElementById('logoutBtn');
-        const userEmailSpan = document.getElementById('userEmail');
+        // Email admin
+        const ADMIN_EMAIL = "teknikotomasiindustri.nepan@gmail.com";
+
+        // DOM elements
         const loadingDiv = document.getElementById('loading');
         const contentDiv = document.getElementById('content');
+        const userEmailSpan = document.getElementById('userEmail');
+        const projectsTableBody = document.getElementById('projectsTableBody');
+        const addProjectForm = document.getElementById('addProjectForm');
+        const newProjectCodeInput = document.getElementById('newProjectCode');
+        const messageDiv = document.getElementById('message');
+        const logoutBtn = document.getElementById('logoutBtn');
 
-        // Cek status autentikasi
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                // User login: tampilkan konten
-                loadingDiv.style.display = 'none';
-                contentDiv.style.display = 'block';
+        // Helper: tampilkan pesan
+        function showMessage(text, isError = true) {
+            messageDiv.textContent = text;
+            messageDiv.className = isError ? 'message error' : 'message success';
+            setTimeout(() => {
+                messageDiv.textContent = '';
+                messageDiv.className = 'message';
+            }, 5000);
+        }
+
+        // Muat data user dan daftar proyek
+        async function loadUserDashboard(user) {
+            try {
+                const userDocRef = doc(db, "users", user.uid);
+                let userSnap = await getDoc(userDocRef);
+                let userData = {};
+                if (!userSnap.exists()) {
+                    // Buat dokumen user dengan array projects kosong
+                    userData = { email: user.email, projects: [], createdAt: new Date() };
+                    await setDoc(userDocRef, userData);
+                } else {
+                    userData = userSnap.data();
+                }
+                const projects = userData.projects || [];
                 userEmailSpan.textContent = user.email;
-            } else {
-                // Tidak ada user: redirect ke halaman login (index.html)
-                window.location.href = 'index.html';
+
+                // Tampilkan daftar proyek dalam tabel
+                projectsTableBody.innerHTML = '';
+                if (projects.length === 0) {
+                    projectsTableBody.innerHTML = '<tr><td colspan="3" style="text-align: center;">Belum ada proyek. Tambahkan menggunakan form di bawah.</td></tr>';
+                } else {
+                    for (const code of projects) {
+                        // Ambil link dari koleksi products (jika ada)
+                        const productDocRef = doc(db, "products", code);
+                        const productSnap = await getDoc(productDocRef);
+                        const link = productSnap.exists() ? productSnap.data().link : null;
+                        const hasLink = link && link.trim() !== '';
+
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td data-label="Kode Proyek">${escapeHtml(code)}</td>
+                            <td data-label="Akses Dashboard">
+                                <button class="open-project-btn" data-code="${code}" data-link="${hasLink ? escapeHtml(link) : ''}" ${!hasLink ? 'disabled' : ''}>
+                                    ${hasLink ? '🚀 Buka Dashboard' : '🔒 Link belum tersedia'}
+                                </button>
+                            </td>
+                            <td data-label="Status">${hasLink ? '<span class="status-active">Aktif</span>' : '<span class="status-pending">Menunggu Link</span>'}</td>
+                        `;
+                        projectsTableBody.appendChild(row);
+                    }
+                    // Event listener untuk tombol buka project
+                    document.querySelectorAll('.open-project-btn').forEach(btn => {
+                        btn.addEventListener('click', () => {
+                            const link = btn.getAttribute('data-link');
+                            if (link) {
+                                window.open(link, '_blank');
+                            } else {
+                                showMessage('Link belum tersedia oleh admin', true);
+                            }
+                        });
+                    });
+                }
+            } catch (error) {
+                showMessage(`Gagal memuat data: ${error.message}`, true);
+                console.error(error);
             }
-        });
+        }
+
+        // Tambah proyek baru
+        async function addProject(user, code) {
+            if (!code.trim()) {
+                showMessage('Kode proyek tidak boleh kosong', true);
+                return;
+            }
+            code = code.trim();
+            try {
+                // Validasi apakah kode proyek ada di koleksi products (tanda admin sudah mengelola)
+                const productDocRef = doc(db, "products", code);
+                const productSnap = await getDoc(productDocRef);
+                if (!productSnap.exists()) {
+                    showMessage(`Kode proyek "${code}" tidak ditemukan. Pastikan kode sudah didaftarkan oleh admin.`, true);
+                    return;
+                }
+
+                // Cek apakah user sudah memiliki kode tersebut
+                const userDocRef = doc(db, "users", user.uid);
+                const userSnap = await getDoc(userDocRef);
+                const userData = userSnap.data();
+                const projects = userData.projects || [];
+                if (projects.includes(code)) {
+                    showMessage(`Anda sudah memiliki proyek dengan kode "${code}".`, true);
+                    return;
+                }
+
+                // Tambahkan ke array projects
+                await updateDoc(userDocRef, {
+                    projects: arrayUnion(code)
+                });
+                showMessage(`Proyek "${code}" berhasil ditambahkan!`, false);
+                // Refresh tampilan
+                await loadUserDashboard(user);
+            } catch (error) {
+                showMessage(`Gagal menambahkan proyek: ${error.message}`, true);
+            }
+        }
 
         // Logout
-        logoutBtn.addEventListener('click', async () => {
-            try {
-                await signOut(auth);
-                // Redirect ke halaman login
+        async function handleLogout() {
+            await signOut(auth);
+            window.location.href = 'index.html';
+        }
+
+        // Cek status autentikasi
+        onAuthStateChanged(auth, async (user) => {
+            if (user && user.email !== ADMIN_EMAIL) {
+                loadingDiv.style.display = 'none';
+                contentDiv.style.display = 'block';
+                await loadUserDashboard(user);
+            } else if (user && user.email === ADMIN_EMAIL) {
+                window.location.href = 'https://teknikotomasiindustrinepan.github.io/projects/dashboard_admin.html';
+            } else {
                 window.location.href = 'index.html';
-            } catch (error) {
-                console.error('Logout gagal:', error);
-                alert('Terjadi kesalahan saat logout.');
             }
         });
+
+        // Event listeners
+        logoutBtn.addEventListener('click', handleLogout);
+        addProjectForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const newCode = newProjectCodeInput.value;
+            const user = auth.currentUser;
+            if (user) {
+                await addProject(user, newCode);
+                newProjectCodeInput.value = '';
+            } else {
+                showMessage('Anda belum login', true);
+            }
+        });
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/[&<>]/g, function(m) {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                return m;
+            });
+        }
     </script>
 
     <style>
@@ -66,103 +197,252 @@
         }
 
         body {
-            min-height: 100vh;
             background: linear-gradient(145deg, #e0eaf4 0%, #cfdef3 100%);
+            min-height: 100vh;
             display: flex;
-            align-items: center;
             justify-content: center;
+            align-items: center;
             padding: 1.5rem;
         }
 
-        .card {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(8px);
+        .dashboard-card {
+            background: rgba(255, 255, 255, 0.96);
             border-radius: 2rem;
             box-shadow: 0 20px 35px -12px rgba(0, 0, 0, 0.2);
-            padding: 2rem;
             width: 100%;
-            max-width: 500px;
-            text-align: center;
-            border: 1px solid rgba(255,255,255,0.6);
+            max-width: 900px;
+            padding: 2rem;
+            backdrop-filter: blur(4px);
         }
 
         h1 {
-            font-size: 2.5rem;
+            font-size: 1.8rem;
+            font-weight: 700;
             background: linear-gradient(135deg, #1A2A4F, #2C3E66);
             background-clip: text;
             -webkit-background-clip: text;
             color: transparent;
-            margin-bottom: 1rem;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
         }
 
-        .user-info {
+        .sub {
+            color: #2c3e66cc;
+            margin-bottom: 1.8rem;
+            border-left: 3px solid #2c7da0;
+            padding-left: 1rem;
+        }
+
+        .info-card {
             background: #eef2fc;
-            padding: 0.8rem;
             border-radius: 1.5rem;
-            margin: 1.5rem 0;
-            font-size: 0.9rem;
-            color: #1e2f41;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
         }
 
-        .user-info i {
-            margin-right: 6px;
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.8rem;
+            flex-wrap: wrap;
         }
 
-        .btn-logout {
-            background: #c0392b;
+        .info-label {
+            font-weight: 600;
+            color: #1f3b4c;
+        }
+
+        .info-value {
+            color: #2c7da0;
+            font-weight: 500;
+            word-break: break-all;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        th, td {
+            text-align: left;
+            padding: 0.75rem;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        th {
+            background: #eef2fc;
+            color: #1f3b4c;
+        }
+
+        button {
+            background: #1f3b4c;
             color: white;
             border: none;
-            padding: 0.8rem 1.5rem;
+            padding: 0.5rem 1rem;
             border-radius: 2rem;
-            font-weight: bold;
-            font-size: 1rem;
             cursor: pointer;
+            font-weight: 600;
             transition: 0.2s;
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
         }
 
-        .btn-logout:hover {
-            background: #a82315;
+        button:hover:not(:disabled) {
+            background: #0f2b3a;
             transform: scale(0.98);
         }
 
-        #loading {
+        button:disabled {
+            background: #9aaebf;
+            cursor: not-allowed;
+        }
+
+        .open-project-btn {
+            background: #2c7da0;
+        }
+
+        .status-active {
+            color: #27ae60;
+            font-weight: 600;
+        }
+
+        .status-pending {
+            color: #e67e22;
+            font-weight: 600;
+        }
+
+        .form-group {
+            margin: 1.2rem 0;
+        }
+
+        input {
+            width: 100%;
+            padding: 0.8rem 1rem;
+            border: 1px solid #cbd5e1;
+            border-radius: 2rem;
             font-size: 1rem;
+            background: white;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #2c7da0;
+            box-shadow: 0 0 0 3px rgba(44,125,160,0.2);
+        }
+
+        .message {
+            margin-top: 1rem;
+            padding: 0.7rem;
+            border-radius: 1rem;
+            text-align: center;
+            font-size: 0.85rem;
+        }
+
+        .error {
+            background: #ffe6e6;
+            color: #c0392b;
+            border-left: 4px solid #c0392b;
+        }
+
+        .success {
+            background: #e0f2e9;
+            color: #1e6f3f;
+            border-left: 4px solid #1e6f3f;
+        }
+
+        .logout-btn {
+            background: #c0392b;
+            margin-top: 1rem;
+            width: 100%;
+        }
+
+        #loading {
+            text-align: center;
+            font-size: 1.2rem;
             color: #2c3e66;
         }
 
-        #content {
-            display: none;
-        }
-
         footer {
+            text-align: center;
             margin-top: 2rem;
             font-size: 0.7rem;
             color: #4a627a;
         }
+
+        @media (max-width: 600px) {
+            .dashboard-card {
+                padding: 1.5rem;
+            }
+            .info-row {
+                flex-direction: column;
+                gap: 0.3rem;
+            }
+            th, td {
+                display: block;
+            }
+            th {
+                display: none;
+            }
+            td {
+                border-bottom: none;
+                position: relative;
+                padding-left: 50%;
+            }
+            td:before {
+                content: attr(data-label);
+                position: absolute;
+                left: 0.75rem;
+                font-weight: bold;
+            }
+        }
     </style>
 </head>
 <body>
-<div class="card">
-    <div id="loading">
-        <i class="fas fa-spinner fa-pulse"></i> Memeriksa sesi...
-    </div>
+<div id="loading">Memuat dashboard...</div>
+<div id="content" style="display: none;">
+    <div class="dashboard-card">
+        <h1><i class="fas fa-chalkboard-user"></i> Dashboard User</h1>
+        <div class="sub">Proyek yang dipesan & akses dashboard</div>
 
-    <div id="content">
-        <h1>Hello World 🌍</h1>
-        <div class="user-info">
-            <i class="fas fa-user-circle"></i> Anda login sebagai:<br>
-            <strong id="userEmail"></strong>
+        <div class="info-card">
+            <div class="info-row">
+                <span class="info-label">Email Anda:</span>
+                <span id="userEmail" class="info-value">-</span>
+            </div>
         </div>
-        <button id="logoutBtn" class="btn-logout">
-            <i class="fas fa-sign-out-alt"></i> Logout
-        </button>
+
+        <h3><i class="fas fa-folder-open"></i> Daftar Proyek Saya</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Kode Proyek</th>
+                    <th>Akses Dashboard</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="projectsTableBody">
+                <tr><td colspan="3">Memuat...</td></tr>
+            </tbody>
+        </table>
+
+        <hr style="margin: 1.5rem 0; border-color: #dce5f0;">
+
+        <h3><i class="fas fa-plus-circle"></i> Tambah Proyek Baru</h3>
+        <form id="addProjectForm">
+            <div class="form-group">
+                <input type="text" id="newProjectCode" placeholder="Masukkan kode proyek yang ingin dipesan" required>
+            </div>
+            <button type="submit" style="width: 100%;">Tambah Proyek</button>
+        </form>
+
+        <div id="message" class="message"></div>
+        <button id="logoutBtn" class="logout-btn">Logout</button>
+        <footer>
+            <i class="fas fa-info-circle"></i> Hanya kode proyek yang sudah didaftarkan admin yang dapat ditambahkan.
+        </footer>
     </div>
-    <footer>
-        <i class="fas fa-firebase"></i> Halaman terlindungi
-    </footer>
 </div>
 
 <!-- Font Awesome -->
