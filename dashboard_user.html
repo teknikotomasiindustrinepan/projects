@@ -19,7 +19,7 @@
 
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
         import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, updateDoc, arrayUnion, arrayRemove } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, setDoc, updateDoc, arrayUnion, collection, getDocs } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
@@ -46,6 +46,28 @@
                 messageDiv.textContent = '';
                 messageDiv.className = 'message';
             }, 5000);
+        }
+
+        // Ambil semua kode produk yang pernah diberikan admin (dari semua user)
+        async function getAllAvailableProductCodes() {
+            const usersRef = collection(db, "users");
+            const snapshot = await getDocs(usersRef);
+            const codesSet = new Set();
+            snapshot.forEach(docSnap => {
+                const userData = docSnap.data();
+                let codes = [];
+                if (userData.productCodes && Array.isArray(userData.productCodes)) {
+                    codes = userData.productCodes;
+                } else if (userData.productCode && userData.productCode !== '') {
+                    codes = [userData.productCode];
+                }
+                codes.forEach(code => {
+                    if (code && code.trim() !== '') {
+                        codesSet.add(code.trim());
+                    }
+                });
+            });
+            return codesSet;
         }
 
         // Muat data user dan daftar proyek
@@ -114,15 +136,14 @@
             }
             code = code.trim();
             try {
-                // Validasi apakah kode proyek ada di koleksi products (tanda admin sudah mengelola)
-                const productDocRef = doc(db, "products", code);
-                const productSnap = await getDoc(productDocRef);
-                if (!productSnap.exists()) {
+                // 1. Validasi apakah kode ada di daftar kode yang pernah diberikan admin
+                const availableCodes = await getAllAvailableProductCodes();
+                if (!availableCodes.has(code)) {
                     showMessage(`Kode proyek "${code}" tidak ditemukan. Pastikan kode sudah didaftarkan oleh admin.`, true);
                     return;
                 }
 
-                // Cek apakah user sudah memiliki kode tersebut
+                // 2. Cek apakah user sudah memiliki kode tersebut
                 const userDocRef = doc(db, "users", user.uid);
                 const userSnap = await getDoc(userDocRef);
                 const userData = userSnap.data();
@@ -132,7 +153,7 @@
                     return;
                 }
 
-                // Tambahkan ke array projects
+                // 3. Tambahkan ke array projects
                 await updateDoc(userDocRef, {
                     projects: arrayUnion(code)
                 });
@@ -189,6 +210,7 @@
     </script>
 
     <style>
+        /* (CSS sama seperti sebelumnya, tidak berubah) */
         * {
             margin: 0;
             padding: 0;
