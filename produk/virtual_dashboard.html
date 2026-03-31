@@ -3,11 +3,313 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>Dashboard Sensor | Suhu, Kelembaban & Kontrol Lampu</title>
+    <title>Loading Dashboard...</title>
     <!-- Chart.js CDN untuk grafik -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <!-- Font Awesome 6 (gratis) untuk ikon lampu dan sensor -->
+    <!-- Font Awesome 6 -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- Firebase SDK v9 -->
+    <script type="module">
+        // ======================= KONFIGURASI FIREBASE =======================
+        const firebaseConfig = {
+            apiKey: "AIzaSyDrg1ltpGK_5Q85SDHVycSqMnaX1zYByLU",
+            authDomain: "toi-projects.firebaseapp.com",
+            projectId: "toi-projects",
+            storageBucket: "toi-projects.firebasestorage.app",
+            messagingSenderId: "676733316634",
+            appId: "1:676733316634:web:161451d5a16ab5346d6ba3"
+        };
+        // ====================================================================
+
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
+        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
+        import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Ambil parameter kode produk dari URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const productCode = urlParams.get('code');
+
+        // Elemen DOM yang akan diisi
+        const productNameTitle = document.getElementById('productNameTitle');
+        const pageTitle = document.getElementById('pageTitle');
+        const backButton = document.getElementById('backButton');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const dashboardContent = document.getElementById('dashboardContent');
+
+        // Fungsi untuk mendapatkan nama produk (custom dari user atau default dari admin)
+        async function getProductDisplayName(userId, code) {
+            try {
+                // 1. Cek dulu di user document (projectCustomNames)
+                const userDocRef = doc(db, "users", userId);
+                const userSnap = await getDoc(userDocRef);
+                let customName = null;
+                if (userSnap.exists()) {
+                    const customNames = userSnap.data().projectCustomNames || {};
+                    if (customNames[code]) {
+                        customName = customNames[code];
+                    }
+                }
+                
+                // 2. Jika ada custom name, gunakan itu
+                if (customName) return customName;
+                
+                // 3. Jika tidak, ambil dari koleksi products
+                const productRef = doc(db, "products", code);
+                const productSnap = await getDoc(productRef);
+                if (productSnap.exists()) {
+                    const defaultName = productSnap.data().name;
+                    if (defaultName && defaultName.trim() !== '') {
+                        return defaultName;
+                    }
+                }
+                // 4. Fallback: gunakan kode produk
+                return code;
+            } catch (error) {
+                console.error("Gagal mengambil nama produk:", error);
+                return code;
+            }
+        }
+
+        // Inisialisasi dashboard setelah nama produk didapat
+        async function initDashboardWithProductName(userId, code) {
+            if (!code) {
+                document.body.innerHTML = '<div style="text-align:center; margin-top:50px;"><i class="fas fa-exclamation-triangle"></i> Kode produk tidak ditemukan di URL. Silakan kembali ke dashboard user.</div>';
+                return;
+            }
+
+            const displayName = await getProductDisplayName(userId, code);
+            
+            // Update judul halaman dan tampilan
+            document.title = `${displayName} | Smart Dashboard`;
+            pageTitle.textContent = displayName;
+            productNameTitle.textContent = displayName;
+            
+            // Sembunyikan loading, tampilkan konten
+            loadingIndicator.style.display = 'none';
+            dashboardContent.style.display = 'block';
+            
+            // Jalankan dashboard sensor (kode yang sudah ada)
+            startSensorDashboard();
+        }
+
+        // ======================= DASHBOARD SENSOR (SAMA SEPERTI SEBELUMNYA) =======================
+        function startSensorDashboard() {
+            // --- Kode dashboard sensor (tidak berubah, hanya dibungkus fungsi) ---
+            const MAX_POINTS = 12;
+            const UPDATE_INTERVAL_MS = 5000;
+            
+            let temperatureData = [];
+            let humidityData = [];
+            let lampOn = false;
+            
+            const tempSpan = document.getElementById('tempValue');
+            const humSpan = document.getElementById('humValue');
+            const lampIcon = document.getElementById('lampIcon');
+            const lampTextSpan = document.getElementById('lampText');
+            const toggleBtn = document.getElementById('toggleLampBtn');
+            const btnLabelSpan = document.getElementById('btnLabel');
+            const ctx = document.getElementById('sensorChart').getContext('2d');
+            let sensorChart = null;
+            
+            function randomTemperature() {
+                let val = 18 + Math.random() * 20;
+                return Math.round(val * 10) / 10;
+            }
+            function randomHumidity() {
+                let val = 30 + Math.random() * 60;
+                return Math.round(val * 10) / 10;
+            }
+            function initDataArrays() {
+                temperatureData = [];
+                humidityData = [];
+                for (let i = 0; i < MAX_POINTS; i++) {
+                    temperatureData.push(randomTemperature());
+                    humidityData.push(randomHumidity());
+                }
+            }
+            function generateLabels() {
+                const labels = [];
+                for (let i = 0; i < MAX_POINTS; i++) {
+                    const secondsAgo = (MAX_POINTS - 1 - i) * 5;
+                    if (secondsAgo === 0) labels.push("0 detik");
+                    else if (secondsAgo < 60) labels.push(`-${secondsAgo} dtk`);
+                    else {
+                        const menit = Math.floor(secondsAgo / 60);
+                        const detik = secondsAgo % 60;
+                        if (detik === 0) labels.push(`-${menit} menit`);
+                        else labels.push(`-${menit}m ${detik}s`);
+                    }
+                }
+                return labels;
+            }
+            function updateCurrentReadingsDisplay() {
+                if (temperatureData.length > 0 && humidityData.length > 0) {
+                    const latestTemp = temperatureData[temperatureData.length - 1];
+                    const latestHum = humidityData[humidityData.length - 1];
+                    tempSpan.innerText = latestTemp.toFixed(1);
+                    humSpan.innerText = latestHum.toFixed(1);
+                } else {
+                    tempSpan.innerText = '--';
+                    humSpan.innerText = '--';
+                }
+            }
+            function addNewSensorData() {
+                const newTemp = randomTemperature();
+                const newHum = randomHumidity();
+                if (temperatureData.length >= MAX_POINTS) {
+                    temperatureData.shift();
+                    humidityData.shift();
+                }
+                temperatureData.push(newTemp);
+                humidityData.push(newHum);
+                while (temperatureData.length < MAX_POINTS) {
+                    temperatureData.unshift(randomTemperature());
+                    humidityData.unshift(randomHumidity());
+                }
+                if (temperatureData.length > MAX_POINTS) {
+                    temperatureData = temperatureData.slice(-MAX_POINTS);
+                    humidityData = humidityData.slice(-MAX_POINTS);
+                }
+                updateCurrentReadingsDisplay();
+                const newLabels = generateLabels();
+                if (sensorChart) {
+                    sensorChart.data.labels = newLabels;
+                    sensorChart.data.datasets[0].data = [...temperatureData];
+                    sensorChart.data.datasets[1].data = [...humidityData];
+                    sensorChart.update();
+                }
+            }
+            function initChart() {
+                if (sensorChart) sensorChart.destroy();
+                const labels = generateLabels();
+                sensorChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: '🌡️ Suhu (°C)',
+                                data: [...temperatureData],
+                                borderColor: '#e63946',
+                                backgroundColor: 'rgba(230, 57, 70, 0.05)',
+                                borderWidth: 3,
+                                pointRadius: 3.5,
+                                pointBackgroundColor: '#e63946',
+                                pointBorderColor: '#fff',
+                                pointHoverRadius: 6,
+                                tension: 0.2,
+                                fill: false,
+                                yAxisID: 'y-temp'
+                            },
+                            {
+                                label: '💧 Kelembaban (%)',
+                                data: [...humidityData],
+                                borderColor: '#2a9d8f',
+                                backgroundColor: 'rgba(42, 157, 143, 0.05)',
+                                borderWidth: 3,
+                                pointRadius: 3.5,
+                                pointBackgroundColor: '#2a9d8f',
+                                pointBorderColor: '#fff',
+                                pointHoverRadius: 6,
+                                tension: 0.2,
+                                fill: false,
+                                yAxisID: 'y-hum'
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        interaction: { mode: 'index', intersect: false },
+                        plugins: {
+                            tooltip: {
+                                mode: 'index',
+                                intersect: false,
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.dataset.label || '';
+                                        let value = context.raw;
+                                        if (context.dataset.label.includes('Suhu')) {
+                                            return `${label}: ${value.toFixed(1)} °C`;
+                                        } else {
+                                            return `${label}: ${value.toFixed(1)} %`;
+                                        }
+                                    }
+                                }
+                            },
+                            legend: { position: 'top', labels: { font: { size: 12, weight: 'bold' }, boxWidth: 30, usePointStyle: true } }
+                        },
+                        scales: {
+                            'y-temp': {
+                                type: 'linear', position: 'left', title: { display: true, text: 'Suhu (°C)', color: '#e63946', font: { weight: 'bold', size: 12 } },
+                                min: 15, max: 42, grid: { drawOnChartArea: true, color: '#e2e8f0' }, ticks: { stepSize: 5, callback: (val) => val + '°C' }
+                            },
+                            'y-hum': {
+                                type: 'linear', position: 'right', title: { display: true, text: 'Kelembaban (%)', color: '#2a9d8f', font: { weight: 'bold', size: 12 } },
+                                min: 20, max: 100, grid: { drawOnChartArea: false }, ticks: { stepSize: 15, callback: (val) => val + '%' }
+                            },
+                            x: { title: { display: true, text: 'Waktu relatif (detik yang lalu)', color: '#4b6a8a' }, ticks: { maxRotation: 35, autoSkip: true, font: { size: 10 } } }
+                        }
+                    }
+                });
+            }
+            function updateLampUI() {
+                if (lampOn) {
+                    lampIcon.style.color = "#f4c542";
+                    lampIcon.style.textShadow = "0 0 5px #ffb347";
+                    lampTextSpan.innerText = "MENYALA";
+                    btnLabelSpan.innerText = "Matikan Lampu";
+                    toggleBtn.style.background = "#c97e2c";
+                    toggleBtn.style.boxShadow = "0 0 8px #ffb34770";
+                } else {
+                    lampIcon.style.color = "#b0b0b0";
+                    lampIcon.style.textShadow = "none";
+                    lampTextSpan.innerText = "MATI";
+                    btnLabelSpan.innerText = "Nyalakan Lampu";
+                    toggleBtn.style.background = "#1f3b4c";
+                    toggleBtn.style.boxShadow = "none";
+                }
+            }
+            function toggleLamp() {
+                lampOn = !lampOn;
+                updateLampUI();
+            }
+            
+            initDataArrays();
+            updateCurrentReadingsDisplay();
+            initChart();
+            lampOn = false;
+            updateLampUI();
+            toggleBtn.addEventListener('click', toggleLamp);
+            setInterval(() => addNewSensorData(), UPDATE_INTERVAL_MS);
+        }
+
+        // ======================= AUTHENTIKASI & AMBIL NAMA PRODUK =======================
+        onAuthStateChanged(auth, async (user) => {
+            if (!user) {
+                // Tidak login, redirect ke index
+                window.location.href = 'index.html';
+                return;
+            }
+            
+            if (!productCode) {
+                document.body.innerHTML = '<div style="text-align:center; margin-top:50px;"><i class="fas fa-exclamation-triangle"></i> Parameter kode produk tidak ditemukan. <a href="dashboard_user.html">Kembali ke Dashboard User</a></div>';
+                return;
+            }
+            
+            await initDashboardWithProductName(user.uid, productCode);
+        });
+
+        // Tombol kembali
+        backButton.addEventListener('click', () => {
+            window.location.href = 'dashboard_user.html';
+        });
+    </script>
+
     <style>
         * {
             margin: 0;
@@ -22,16 +324,15 @@
             padding: 2rem 1.5rem;
         }
 
-        /* Container utama */
         .dashboard {
             max-width: 1400px;
             margin: 0 auto;
         }
 
-        /* Judul & deskripsi */
         .header {
             text-align: center;
             margin-bottom: 2rem;
+            position: relative;
         }
 
         .header h1 {
@@ -65,7 +366,30 @@
             font-size: 0.9rem;
         }
 
-        /* Grid kartu */
+        /* Tombol kembali */
+        .back-btn-container {
+            text-align: left;
+            margin-bottom: 1rem;
+        }
+        .btn-back {
+            background: #1f3b4c;
+            color: white;
+            border: none;
+            padding: 0.6rem 1.2rem;
+            border-radius: 2rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9rem;
+        }
+        .btn-back:hover {
+            background: #0f2b3a;
+            transform: scale(0.98);
+        }
+
         .grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -73,7 +397,6 @@
             margin-bottom: 2rem;
         }
 
-        /* Style Kartu */
         .card {
             background: rgba(255, 255, 255, 0.92);
             backdrop-filter: blur(2px);
@@ -107,7 +430,6 @@
             color: #2c7da0;
         }
 
-        /* nilai sensor besar */
         .sensor-value {
             display: flex;
             justify-content: space-between;
@@ -147,7 +469,6 @@
             color: #4a627a;
         }
 
-        /* lampu section */
         .lamp-control {
             display: flex;
             align-items: center;
@@ -197,7 +518,6 @@
             transform: scale(0.98);
         }
 
-        /* grafik card */
         .graph-card {
             grid-column: 1 / -1;
         }
@@ -233,6 +553,13 @@
             color: #2c3e66b3;
         }
 
+        #loadingIndicator {
+            text-align: center;
+            margin-top: 50px;
+            font-size: 1.2rem;
+            color: #2c3e66;
+        }
+
         @media (max-width: 700px) {
             body {
                 padding: 1rem;
@@ -247,413 +574,87 @@
     </style>
 </head>
 <body>
-
-<div class="dashboard">
-    <div class="header">
-        <h1>
-            <i class="fas fa-microchip"></i> 
-            Dashboard Smart Sensor
-        </h1>
-        <div class="sub">
-            <i class="fas fa-chart-line"></i> Data acak real-time | update setiap 5 detik
-        </div>
-    </div>
-
-    <div class="grid">
-        <!-- Kartu Suhu & Kelembaban -->
-        <div class="card">
-            <div class="card-title">
-                <i class="fas fa-temperature-high"></i> 
-                <span>Sensor Lingkungan</span>
-            </div>
-            <div class="sensor-value">
-                <div class="reading">
-                    <div class="reading-label">
-                        <i class="fas fa-thermometer-half"></i> SUHU
-                    </div>
-                    <div class="reading-number">
-                        <span id="tempValue">--</span><span class="unit">°C</span>
-                    </div>
-                </div>
-                <div class="reading">
-                    <div class="reading-label">
-                        <i class="fas fa-tint"></i> KELEMBABAN
-                    </div>
-                    <div class="reading-number">
-                        <span id="humValue">--</span><span class="unit">%</span>
-                    </div>
-                </div>
-            </div>
-            <div style="font-size: 0.75rem; color: #4b6a8a; margin-top: 8px; text-align: center;">
-                <i class="fas fa-sync-alt"></i> Nilai terbaru dari sensor (random)
-            </div>
-        </div>
-
-        <!-- Kartu Kontrol Lampu ON/OFF -->
-        <div class="card">
-            <div class="card-title">
-                <i class="fas fa-lightbulb"></i>
-                <span>Kontrol Lampu Ruang</span>
-            </div>
-            <div class="lamp-control">
-                <div class="lamp-status-badge" id="lampStatusBox">
-                    <i class="fas fa-lightbulb lamp-icon" id="lampIcon" style="color: #b0b0b0;"></i>
-                    <span class="lamp-text" id="lampText">MATI</span>
-                </div>
-                <button class="btn-lamp" id="toggleLampBtn">
-                    <i class="fas fa-power-off"></i> 
-                    <span id="btnLabel">Nyalakan Lampu</span>
-                </button>
-            </div>
-            <div style="margin-top: 18px; font-size: 0.75rem; background: #eef2fc; border-radius: 28px; padding: 8px 12px; text-align: center;">
-                <i class="fas fa-hand-pointer"></i> Klik tombol untuk mengontrol lampu secara manual
-            </div>
-        </div>
-    </div>
-
-    <!-- Grafik sensor (riwayat suhu & kelembaban) -->
-    <div class="card graph-card">
-        <div class="card-title">
-            <i class="fas fa-chart-scatter"></i>
-            <span>Grafik Data Sensor (12 sampel terbaru)</span>
-        </div>
-        <div class="chart-container">
-            <canvas id="sensorChart" width="800" height="380" style="width:100%; height:auto; max-height:380px"></canvas>
-        </div>
-        <div style="display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; margin-top: 12px;">
-            <span><i class="fas fa-chart-line" style="color:#e63946;"></i> Suhu (°C) - skala kiri</span>
-            <span><i class="fas fa-chart-line" style="color:#2a9d8f;"></i> Kelembaban (%) - skala kanan</span>
-            <span><i class="fas fa-clock"></i> Pembaruan otomatis tiap 5 detik</span>
-        </div>
-        <div class="info-note">
-            <i class="fas fa-random"></i> Data sensor dibangkitkan secara acak (suhu 18-38°C , kelembaban 30-90%)
-        </div>
-    </div>
-    <footer>
-        <i class="fas fa-chart-simple"></i> Dashboard Virtual IoT | Simulasi sensor real-time | GitHub Pages ready
-    </footer>
+<div id="loadingIndicator" style="display: flex; justify-content: center; align-items: center; height: 100vh;">
+    <i class="fas fa-spinner fa-pulse"></i> Memuat dashboard...
 </div>
+<div id="dashboardContent" style="display: none;">
+    <div class="dashboard">
+        <div class="back-btn-container">
+            <button id="backButton" class="btn-back"><i class="fas fa-arrow-left"></i> Kembali ke Dashboard User</button>
+        </div>
+        <div class="header">
+            <h1>
+                <i class="fas fa-microchip"></i> 
+                <span id="pageTitle">Smart Dashboard</span>
+            </h1>
+            <div class="sub">
+                <i class="fas fa-chart-line"></i> Data real-time | update setiap 5 detik
+            </div>
+        </div>
 
-<script>
-    (function() {
-        // ----- KONFIGURASI -----
-        const MAX_POINTS = 12;          // menampilkan 12 titik data (setiap 5 detik = 1 menit penuh)
-        const UPDATE_INTERVAL_MS = 5000; // 5 detik
-        
-        // Data array untuk grafik (suhu & kelembaban)
-        let temperatureData = [];
-        let humidityData = [];
-        
-        // State lampu (ON / OFF)
-        let lampOn = false;   // false = mati, true = menyala
-        
-        // Referensi elemen DOM
-        const tempSpan = document.getElementById('tempValue');
-        const humSpan = document.getElementById('humValue');
-        const lampIcon = document.getElementById('lampIcon');
-        const lampTextSpan = document.getElementById('lampText');
-        const toggleBtn = document.getElementById('toggleLampBtn');
-        const btnLabelSpan = document.getElementById('btnLabel');
-        
-        // Referensi chart & canvas
-        const ctx = document.getElementById('sensorChart').getContext('2d');
-        let sensorChart = null;
-        
-        // ----- Fungsi utilitas random (suhu 18-38°C, kelembaban 30-90%) dengan 1 desimal -----
-        function randomTemperature() {
-            let val = 18 + Math.random() * 20;   // 18.0 - 38.0
-            return Math.round(val * 10) / 10;
-        }
-        
-        function randomHumidity() {
-            let val = 30 + Math.random() * 60;   // 30.0 - 90.0
-            return Math.round(val * 10) / 10;
-        }
-        
-        // Membangkitkan array awal dengan data random sepanjang MAX_POINTS
-        function initDataArrays() {
-            temperatureData = [];
-            humidityData = [];
-            for (let i = 0; i < MAX_POINTS; i++) {
-                temperatureData.push(randomTemperature());
-                humidityData.push(randomHumidity());
-            }
-        }
-        
-        // Membuat label berdasarkan usia data (detik yang lalu) 
-        // Urutan array: index 0 = data paling lama, index terakhir = data terbaru (sekarang)
-        function generateLabels() {
-            const labels = [];
-            for (let i = 0; i < MAX_POINTS; i++) {
-                // data ke-i dari kiri (paling lama) => usia = (MAX_POINTS-1 - i) * 5 detik
-                const secondsAgo = (MAX_POINTS - 1 - i) * 5;
-                if (secondsAgo === 0) {
-                    labels.push("0 detik");
-                } else if (secondsAgo < 60) {
-                    labels.push(`-${secondsAgo} dtk`);
-                } else {
-                    const menit = Math.floor(secondsAgo / 60);
-                    const detik = secondsAgo % 60;
-                    if (detik === 0) labels.push(`-${menit} menit`);
-                    else labels.push(`-${menit}m ${detik}s`);
-                }
-            }
-            return labels;
-        }
-        
-        // Memperbarui tampilan nilai suhu & kelembaban berdasarkan data terbaru (elemen terakhir array)
-        function updateCurrentReadingsDisplay() {
-            if (temperatureData.length > 0 && humidityData.length > 0) {
-                const latestTemp = temperatureData[temperatureData.length - 1];
-                const latestHum = humidityData[humidityData.length - 1];
-                tempSpan.innerText = latestTemp.toFixed(1);
-                humSpan.innerText = latestHum.toFixed(1);
-            } else {
-                tempSpan.innerText = '--';
-                humSpan.innerText = '--';
-            }
-        }
-        
-        // Fungsi utama menambah data sensor baru secara random dan mengupdate grafik + tampilan
-        function addNewSensorData() {
-            // 1. Generate data baru random
-            const newTemp = randomTemperature();
-            const newHum = randomHumidity();
-            
-            // 2. Geser data (hapus paling lama jika sudah mencapai MAX_POINTS, lalu push baru)
-            if (temperatureData.length >= MAX_POINTS) {
-                temperatureData.shift();
-                humidityData.shift();
-            }
-            temperatureData.push(newTemp);
-            humidityData.push(newHum);
-            
-            // 3. Pastikan panjang array tetap MAX_POINTS (setelah shift + push)
-            // (jika awalnya kurang karena inisialisasi sempurna, tapi amankan)
-            while (temperatureData.length < MAX_POINTS) {
-                // fallback: seharusnya tidak terjadi karena init full, tapi antisipasi
-                temperatureData.unshift(randomTemperature());
-                humidityData.unshift(randomHumidity());
-            }
-            if (temperatureData.length > MAX_POINTS) {
-                temperatureData = temperatureData.slice(-MAX_POINTS);
-                humidityData = humidityData.slice(-MAX_POINTS);
-            }
-            
-            // 4. Update tampilan nilai saat ini (suhu/kelembaban terbaru)
-            updateCurrentReadingsDisplay();
-            
-            // 5. Update grafik: refresh label (karena usia data berubah) & dataset
-            const newLabels = generateLabels();
-            if (sensorChart) {
-                sensorChart.data.labels = newLabels;
-                sensorChart.data.datasets[0].data = [...temperatureData];
-                sensorChart.data.datasets[1].data = [...humidityData];
-                sensorChart.update();   // animasi halus
-            } else {
-                // Jika chart belum dibuat (tidak mungkin karena init dulu) tapi safety
-                console.warn("Chart belum diinisialisasi");
-            }
-        }
-        
-        // ----- Setup chart menggunakan Chart.js (dual axis: suhu kiri, kelembaban kanan) -----
-        function initChart() {
-            if (sensorChart) {
-                sensorChart.destroy();
-            }
-            
-            const labels = generateLabels();
-            
-            sensorChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [
-                        {
-                            label: '🌡️ Suhu (°C)',
-                            data: [...temperatureData],
-                            borderColor: '#e63946',
-                            backgroundColor: 'rgba(230, 57, 70, 0.05)',
-                            borderWidth: 3,
-                            pointRadius: 3.5,
-                            pointBackgroundColor: '#e63946',
-                            pointBorderColor: '#fff',
-                            pointHoverRadius: 6,
-                            tension: 0.2,
-                            fill: false,
-                            yAxisID: 'y-temp'
-                        },
-                        {
-                            label: '💧 Kelembaban (%)',
-                            data: [...humidityData],
-                            borderColor: '#2a9d8f',
-                            backgroundColor: 'rgba(42, 157, 143, 0.05)',
-                            borderWidth: 3,
-                            pointRadius: 3.5,
-                            pointBackgroundColor: '#2a9d8f',
-                            pointBorderColor: '#fff',
-                            pointHoverRadius: 6,
-                            tension: 0.2,
-                            fill: false,
-                            yAxisID: 'y-hum'
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: true,
-                    interaction: {
-                        mode: 'index',
-                        intersect: false,
-                    },
-                    plugins: {
-                        tooltip: {
-                            mode: 'index',
-                            intersect: false,
-                            callbacks: {
-                                label: function(context) {
-                                    let label = context.dataset.label || '';
-                                    let value = context.raw;
-                                    if (context.dataset.label.includes('Suhu')) {
-                                        return `${label}: ${value.toFixed(1)} °C`;
-                                    } else {
-                                        return `${label}: ${value.toFixed(1)} %`;
-                                    }
-                                }
-                            }
-                        },
-                        legend: {
-                            position: 'top',
-                            labels: {
-                                font: { size: 12, weight: 'bold' },
-                                boxWidth: 30,
-                                usePointStyle: true,
-                            }
-                        }
-                    },
-                    scales: {
-                        'y-temp': {
-                            type: 'linear',
-                            position: 'left',
-                            title: {
-                                display: true,
-                                text: 'Suhu (°C)',
-                                color: '#e63946',
-                                font: { weight: 'bold', size: 12 }
-                            },
-                            min: 15,
-                            max: 42,
-                            grid: {
-                                drawOnChartArea: true,
-                                color: '#e2e8f0'
-                            },
-                            ticks: {
-                                stepSize: 5,
-                                callback: function(val) { return val + '°C'; }
-                            }
-                        },
-                        'y-hum': {
-                            type: 'linear',
-                            position: 'right',
-                            title: {
-                                display: true,
-                                text: 'Kelembaban (%)',
-                                color: '#2a9d8f',
-                                font: { weight: 'bold', size: 12 }
-                            },
-                            min: 20,
-                            max: 100,
-                            grid: {
-                                drawOnChartArea: false,  // menghindari garis ganda
-                            },
-                            ticks: {
-                                stepSize: 15,
-                                callback: function(val) { return val + '%'; }
-                            }
-                        },
-                        x: {
-                            title: {
-                                display: true,
-                                text: 'Waktu relatif (detik yang lalu)',
-                                color: '#4b6a8a'
-                            },
-                            ticks: {
-                                maxRotation: 35,
-                                autoSkip: true,
-                                font: { size: 10 }
-                            }
-                        }
-                    },
-                    elements: {
-                        line: {
-                            borderJoin: 'round'
-                        }
-                    }
-                }
-            });
-        }
-        
-        // ----- Fungsi untuk memperbarui lampu (tampilan UI) -----
-        function updateLampUI() {
-            if (lampOn) {
-                // Lampu ON
-                lampIcon.style.color = "#f4c542";
-                lampIcon.style.textShadow = "0 0 5px #ffb347";
-                lampTextSpan.innerText = "MENYALA";
-                btnLabelSpan.innerText = "Matikan Lampu";
-                toggleBtn.style.background = "#c97e2c";
-                toggleBtn.style.boxShadow = "0 0 8px #ffb34770";
-                // optional tambah efek
-            } else {
-                // Lampu OFF
-                lampIcon.style.color = "#b0b0b0";
-                lampIcon.style.textShadow = "none";
-                lampTextSpan.innerText = "MATI";
-                btnLabelSpan.innerText = "Nyalakan Lampu";
-                toggleBtn.style.background = "#1f3b4c";
-                toggleBtn.style.boxShadow = "none";
-            }
-        }
-        
-        // Event toggle lampu
-        function toggleLamp() {
-            lampOn = !lampOn;
-            updateLampUI();
-            // Bisa ditambahkan console log atau efek, tetapi sesuai permintaan hanya kontrol on/off
-            // (tidak mempengaruhi sensor)
-        }
-        
-        // ----- Inisialisasi penuh dashboard -----
-        function initDashboard() {
-            // 1. Inisialisasi data random array penuh (12 poin)
-            initDataArrays();
-            // 2. Tampilkan nilai terbaru di card suhu/kelembaban
-            updateCurrentReadingsDisplay();
-            // 3. Buat chart dengan data awal
-            initChart();
-            // 4. Setup lampu awal (mati)
-            lampOn = false;
-            updateLampUI();
-            // 5. Event listener tombol lampu
-            toggleBtn.addEventListener('click', toggleLamp);
-            
-            // 6. Mulai interval update sensor setiap 5 detik (data random & grafik)
-            //    Jangan tumpuk interval, simpan ID jika diperlukan
-            setInterval(() => {
-                addNewSensorData();
-            }, UPDATE_INTERVAL_MS);
-            
-            // 7. (Opsional) tambahkan efek visual bahwa dashboard siap
-            console.log("Dashboard siap, update sensor setiap 5 detik.");
-        }
-        
-        // Jalankan semua setelah DOM siap
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', initDashboard);
-        } else {
-            initDashboard();
-        }
-    })();
-</script>
+        <div class="grid">
+            <div class="card">
+                <div class="card-title">
+                    <i class="fas fa-temperature-high"></i> 
+                    <span>Sensor Lingkungan</span>
+                </div>
+                <div class="sensor-value">
+                    <div class="reading">
+                        <div class="reading-label"><i class="fas fa-thermometer-half"></i> SUHU</div>
+                        <div class="reading-number"><span id="tempValue">--</span><span class="unit">°C</span></div>
+                    </div>
+                    <div class="reading">
+                        <div class="reading-label"><i class="fas fa-tint"></i> KELEMBABAN</div>
+                        <div class="reading-number"><span id="humValue">--</span><span class="unit">%</span></div>
+                    </div>
+                </div>
+                <div style="font-size: 0.75rem; color: #4b6a8a; margin-top: 8px; text-align: center;">
+                    <i class="fas fa-sync-alt"></i> Nilai terbaru dari sensor (random)
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">
+                    <i class="fas fa-lightbulb"></i>
+                    <span>Kontrol Lampu Ruang</span>
+                </div>
+                <div class="lamp-control">
+                    <div class="lamp-status-badge" id="lampStatusBox">
+                        <i class="fas fa-lightbulb lamp-icon" id="lampIcon" style="color: #b0b0b0;"></i>
+                        <span class="lamp-text" id="lampText">MATI</span>
+                    </div>
+                    <button class="btn-lamp" id="toggleLampBtn">
+                        <i class="fas fa-power-off"></i> 
+                        <span id="btnLabel">Nyalakan Lampu</span>
+                    </button>
+                </div>
+                <div style="margin-top: 18px; font-size: 0.75rem; background: #eef2fc; border-radius: 28px; padding: 8px 12px; text-align: center;">
+                    <i class="fas fa-hand-pointer"></i> Klik tombol untuk mengontrol lampu secara manual
+                </div>
+            </div>
+        </div>
+
+        <div class="card graph-card">
+            <div class="card-title">
+                <i class="fas fa-chart-scatter"></i>
+                <span>Grafik Data Sensor (12 sampel terbaru)</span>
+            </div>
+            <div class="chart-container">
+                <canvas id="sensorChart" width="800" height="380" style="width:100%; height:auto; max-height:380px"></canvas>
+            </div>
+            <div style="display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; margin-top: 12px;">
+                <span><i class="fas fa-chart-line" style="color:#e63946;"></i> Suhu (°C) - skala kiri</span>
+                <span><i class="fas fa-chart-line" style="color:#2a9d8f;"></i> Kelembaban (%) - skala kanan</span>
+                <span><i class="fas fa-clock"></i> Pembaruan otomatis tiap 5 detik</span>
+            </div>
+            <div class="info-note">
+                <i class="fas fa-random"></i> Data sensor dibangkitkan secara acak (suhu 18-38°C , kelembaban 30-90%)
+            </div>
+        </div>
+        <footer>
+            <i class="fas fa-chart-simple"></i> Dashboard Virtual IoT | Simulasi sensor real-time | <span id="productNameTitle"></span>
+        </footer>
+    </div>
+</div>
 </body>
 </html>
