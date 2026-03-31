@@ -48,6 +48,17 @@
             }, 5000);
         }
 
+        // Helper: escape HTML
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/[&<>]/g, function(m) {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                return m;
+            });
+        }
+
         // Muat data user dan daftar proyek
         async function loadUserDashboard(user) {
             try {
@@ -57,10 +68,11 @@
                 let userData = {};
 
                 if (!userSnap.exists()) {
-                    // Buat dokumen user baru dengan array projects kosong
+                    // Buat dokumen user baru dengan array projects kosong dan projectCustomNames kosong
                     userData = {
                         email: user.email,
                         projects: [],
+                        projectCustomNames: {},
                         createdAt: new Date()
                     };
                     await setDoc(userDocRef, userData);
@@ -69,22 +81,47 @@
                 }
 
                 const projects = userData.projects || [];
+                const customNames = userData.projectCustomNames || {}; // object { code: customName }
+                
                 userEmailSpan.textContent = user.email;
 
                 // Tampilkan daftar proyek dalam tabel
                 projectsTableBody.innerHTML = '';
                 if (projects.length === 0) {
-                    projectsTableBody.innerHTML = ' tr><td colspan="3" style="text-align: center;">Belum ada proyek. Tambahkan menggunakan form di bawah.</td></tr>';
+                    projectsTableBody.innerHTML = '<tr><td colspan="4" style="text-align: center;">Belum ada proyek. Tambahkan menggunakan form di bawah.</td></tr>';
                 } else {
                     for (const code of projects) {
-                        // Ambil link dari koleksi products (jika ada)
+                        // Ambil data produk dari koleksi products (nama default dan link)
                         const productDocRef = doc(db, "products", code);
                         const productSnap = await getDoc(productDocRef);
-                        const link = productSnap.exists() ? productSnap.data().link : null;
+                        let defaultName = code; // fallback
+                        let link = null;
+                        if (productSnap.exists()) {
+                            defaultName = productSnap.data().name || code;
+                            link = productSnap.data().link || null;
+                        } else {
+                            // produk tidak ditemukan di koleksi products (mungkin sudah dihapus admin)
+                            defaultName = code + " (produk tidak dikenal)";
+                        }
+                        
                         const hasLink = link && link.trim() !== '';
-
+                        const displayName = customNames[code] ? customNames[code] : defaultName;
+                        
+                        // Buat baris tabel dengan kolom Nama Projek (bisa diedit)
                         const row = document.createElement('tr');
+                        row.setAttribute('data-code', code);
                         row.innerHTML = `
+                            <td data-label="Nama Projek" class="project-name-cell">
+                                <span class="project-name-text">${escapeHtml(displayName)}</span>
+                                <button class="edit-name-btn" data-code="${escapeHtml(code)}" title="Edit nama projek">✏️</button>
+                                <div class="edit-name-form hidden">
+                                    <input type="text" class="edit-name-input" value="${escapeHtml(displayName)}">
+                                    <div class="edit-buttons">
+                                        <button class="save-name-btn">Simpan</button>
+                                        <button class="cancel-name-btn">Batal</button>
+                                    </div>
+                                </div>
+                            </td>
                             <td data-label="Kode Proyek">${escapeHtml(code)}</td>
                             <td data-label="Akses Dashboard">
                                 <button class="open-project-btn" data-link="${hasLink ? escapeHtml(link) : ''}" ${!hasLink ? 'disabled' : ''}>
@@ -101,10 +138,79 @@
                         btn.addEventListener('click', () => {
                             const link = btn.getAttribute('data-link');
                             if (link) {
-                                window.location.href = link;  // redirect halaman saat ini
+                                window.location.href = link;
                             } else {
                                 showMessage('Link belum tersedia oleh admin', true);
                             }
+                        });
+                    });
+
+                    // Event listener untuk tombol edit nama (tampilkan form inline)
+                    document.querySelectorAll('.edit-name-btn').forEach(btn => {
+                        btn.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            const cell = btn.closest('.project-name-cell');
+                            const textSpan = cell.querySelector('.project-name-text');
+                            const editForm = cell.querySelector('.edit-name-form');
+                            const editInput = editForm.querySelector('.edit-name-input');
+                            
+                            // Sembunyikan teks dan tombol edit, tampilkan form
+                            textSpan.classList.add('hidden');
+                            btn.classList.add('hidden');
+                            editForm.classList.remove('hidden');
+                            editInput.focus();
+                        });
+                    });
+
+                    // Event listener untuk simpan perubahan nama
+                    document.querySelectorAll('.save-name-btn').forEach(btn => {
+                        btn.addEventListener('click', async (e) => {
+                            const cell = btn.closest('.project-name-cell');
+                            const code = cell.closest('tr').getAttribute('data-code');
+                            const editInput = cell.querySelector('.edit-name-input');
+                            const newName = editInput.value.trim();
+                            
+                            if (!newName) {
+                                showMessage('Nama projek tidak boleh kosong', true);
+                                return;
+                            }
+                            
+                            try {
+                                // Simpan custom name ke dokumen user di field projectCustomNames
+                                const userDocRef = doc(db, "users", user.uid);
+                                const updatedCustomNames = { ...customNames };
+                                updatedCustomNames[code] = newName;
+                                await updateDoc(userDocRef, { projectCustomNames: updatedCustomNames });
+                                
+                                // Update tampilan tanpa reload semua data
+                                const textSpan = cell.querySelector('.project-name-text');
+                                textSpan.textContent = newName;
+                                
+                                // Kembalikan ke mode tampilan
+                                textSpan.classList.remove('hidden');
+                                const editBtn = cell.querySelector('.edit-name-btn');
+                                editBtn.classList.remove('hidden');
+                                const editForm = cell.querySelector('.edit-name-form');
+                                editForm.classList.add('hidden');
+                                
+                                showMessage(`Nama projek berhasil diubah menjadi "${newName}"`, false);
+                            } catch (error) {
+                                showMessage(`Gagal mengubah nama: ${error.message}`, true);
+                            }
+                        });
+                    });
+
+                    // Event listener untuk batal edit
+                    document.querySelectorAll('.cancel-name-btn').forEach(btn => {
+                        btn.addEventListener('click', (e) => {
+                            const cell = btn.closest('.project-name-cell');
+                            const textSpan = cell.querySelector('.project-name-text');
+                            const editBtn = cell.querySelector('.edit-name-btn');
+                            const editForm = cell.querySelector('.edit-name-form');
+                            
+                            textSpan.classList.remove('hidden');
+                            editBtn.classList.remove('hidden');
+                            editForm.classList.add('hidden');
                         });
                     });
                 }
@@ -133,14 +239,14 @@
                 // 2. Cek apakah user sudah memiliki kode tersebut
                 const userDocRef = doc(db, "users", user.uid);
                 const userSnap = await getDoc(userDocRef);
-                const userData = userSnap.exists() ? userSnap.data() : { projects: [] };
+                let userData = userSnap.exists() ? userSnap.data() : { projects: [], projectCustomNames: {} };
                 const projects = userData.projects || [];
                 if (projects.includes(code)) {
                     showMessage(`Anda sudah memiliki proyek dengan kode "${code}".`, true);
                     return;
                 }
 
-                // 3. Tambahkan ke array projects user
+                // 3. Tambahkan ke array projects user (tanpa custom name dulu)
                 await updateDoc(userDocRef, {
                     projects: arrayUnion(code)
                 });
@@ -187,21 +293,9 @@
                 showMessage('Anda belum login', true);
             }
         });
-
-        // Helper escape HTML
-        function escapeHtml(str) {
-            if (!str) return '';
-            return str.replace(/[&<>]/g, function(m) {
-                if (m === '&') return '&amp;';
-                if (m === '<') return '&lt;';
-                if (m === '>') return '&gt;';
-                return m;
-            });
-        }
     </script>
 
     <style>
-        /* (CSS sama seperti sebelumnya) */
         * {
             margin: 0;
             padding: 0;
@@ -223,7 +317,7 @@
             border-radius: 2rem;
             box-shadow: 0 20px 35px -12px rgba(0, 0, 0, 0.2);
             width: 100%;
-            max-width: 900px;
+            max-width: 1000px;
             padding: 2rem;
             backdrop-filter: blur(4px);
         }
@@ -284,6 +378,7 @@
             text-align: left;
             padding: 0.75rem;
             border-bottom: 1px solid #e2e8f0;
+            vertical-align: middle;
         }
 
         th {
@@ -384,6 +479,53 @@
             color: #4a627a;
         }
 
+        /* Gaya untuk kolom nama projek dan edit */
+        .project-name-cell {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+        .project-name-text {
+            flex: 1;
+            font-weight: 500;
+        }
+        .edit-name-btn {
+            background: #f39c12;
+            padding: 0.2rem 0.6rem;
+            font-size: 0.8rem;
+        }
+        .edit-name-form {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            align-items: center;
+            width: 100%;
+        }
+        .edit-name-input {
+            flex: 2;
+            min-width: 120px;
+            padding: 0.4rem 0.8rem;
+            border-radius: 2rem;
+        }
+        .edit-buttons {
+            display: flex;
+            gap: 0.3rem;
+        }
+        .edit-buttons button {
+            padding: 0.3rem 0.8rem;
+            font-size: 0.8rem;
+        }
+        .save-name-btn {
+            background: #27ae60;
+        }
+        .cancel-name-btn {
+            background: #7f8c8d;
+        }
+        .hidden {
+            display: none;
+        }
+
         @media (max-width: 600px) {
             .dashboard-card {
                 padding: 1.5rem;
@@ -409,6 +551,17 @@
                 left: 0.75rem;
                 font-weight: bold;
             }
+            .project-name-cell {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .edit-name-form {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .edit-buttons {
+                justify-content: flex-start;
+            }
         }
     </style>
 </head>
@@ -430,13 +583,14 @@
         <table>
             <thead>
                 <tr>
+                    <th>Nama Projek</th>
                     <th>Kode Proyek</th>
                     <th>Akses Dashboard</th>
                     <th>Status</th>
                 </tr>
             </thead>
             <tbody id="projectsTableBody">
-                <tr><td colspan="3">Memuat...</td></tr>
+                <tr><td colspan="4">Memuat...</td></tr>
             </tbody>
         </table>
 
@@ -453,7 +607,7 @@
         <div id="message" class="message"></div>
         <button id="logoutBtn" class="logout-btn">Logout</button>
         <footer>
-            <i class="fas fa-info-circle"></i> Hanya kode proyek yang sudah didaftarkan admin yang dapat ditambahkan.
+            <i class="fas fa-info-circle"></i> Hanya kode proyek yang sudah didaftarkan admin yang dapat ditambahkan. Anda dapat mengedit nama projek sesuai keinginan.
         </footer>
     </div>
 </div>
