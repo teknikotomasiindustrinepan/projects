@@ -19,7 +19,7 @@
 
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
         import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, setDoc, updateDoc, arrayUnion, arrayRemove } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
@@ -59,6 +59,26 @@
             });
         }
 
+        // Hapus proyek dari user (tanpa menghapus produk global)
+        async function removeProjectFromUser(userId, code) {
+            const userRef = doc(db, "users", userId);
+            const userSnap = await getDoc(userRef);
+            if (!userSnap.exists()) return;
+            
+            // Hapus dari array projects
+            await updateDoc(userRef, {
+                projects: arrayRemove(code)
+            });
+            
+            // Hapus custom name jika ada
+            const userData = userSnap.data();
+            const customNames = userData.projectCustomNames || {};
+            if (customNames[code]) {
+                delete customNames[code];
+                await updateDoc(userRef, { projectCustomNames: customNames });
+            }
+        }
+
         // Muat data user dan daftar proyek
         async function loadUserDashboard(user) {
             try {
@@ -81,26 +101,25 @@
                 }
 
                 const projects = userData.projects || [];
-                const customNames = userData.projectCustomNames || {}; // object { code: customName }
+                const customNames = userData.projectCustomNames || {};
                 
                 userEmailSpan.textContent = user.email;
 
                 // Tampilkan daftar proyek dalam tabel
                 projectsTableBody.innerHTML = '';
                 if (projects.length === 0) {
-                    projectsTableBody.innerHTML = '<tr><td colspan="4" style="text-align: center;">Belum ada proyek. Tambahkan menggunakan form di bawah.</td></tr>';
+                    projectsTableBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Belum ada proyek. Tambahkan menggunakan form di bawah.</td></tr>';
                 } else {
                     for (const code of projects) {
                         // Ambil data produk dari koleksi products (nama default dan link)
                         const productDocRef = doc(db, "products", code);
                         const productSnap = await getDoc(productDocRef);
-                        let defaultName = code; // fallback
+                        let defaultName = code;
                         let link = null;
                         if (productSnap.exists()) {
                             defaultName = productSnap.data().name || code;
                             link = productSnap.data().link || null;
                         } else {
-                            // produk tidak ditemukan di koleksi products (mungkin sudah dihapus admin)
                             defaultName = code + " (produk tidak dikenal)";
                         }
                         
@@ -125,15 +144,18 @@
                             <td data-label="Kode Proyek">${escapeHtml(code)}</td>
                             <td data-label="Akses Dashboard">
                                 <button class="open-project-btn" data-link="${hasLink ? escapeHtml(link) : ''}" ${!hasLink ? 'disabled' : ''}>
-                                    ${hasLink ? '🚀 Buka Dashboard' : '🔒 Link belum tersedia'}
+                                    <i class="fas fa-tachometer-alt"></i> Dashboard
                                 </button>
                             </td>
                             <td data-label="Status">${hasLink ? '<span class="status-active">Aktif</span>' : '<span class="status-pending">Menunggu Link</span>'}</td>
+                            <td data-label="Hapus">
+                                <button class="delete-project-btn" data-code="${escapeHtml(code)}" title="Hapus proyek">✖</button>
+                            </td>
                         `;
                         projectsTableBody.appendChild(row);
                     }
 
-                    // Event listener untuk tombol buka project – redirect ke link (tidak buka tab baru)
+                    // Event listener untuk tombol buka dashboard
                     document.querySelectorAll('.open-project-btn').forEach(btn => {
                         btn.addEventListener('click', () => {
                             const link = btn.getAttribute('data-link');
@@ -145,7 +167,23 @@
                         });
                     });
 
-                    // Event listener untuk tombol edit nama (tampilkan form inline)
+                    // Event listener untuk tombol hapus proyek
+                    document.querySelectorAll('.delete-project-btn').forEach(btn => {
+                        btn.addEventListener('click', async (e) => {
+                            const code = btn.getAttribute('data-code');
+                            if (confirm(`Hapus proyek "${code}" dari daftar Anda?`)) {
+                                try {
+                                    await removeProjectFromUser(user.uid, code);
+                                    showMessage(`Proyek "${code}" berhasil dihapus.`, false);
+                                    await loadUserDashboard(user);
+                                } catch (error) {
+                                    showMessage(`Gagal menghapus: ${error.message}`, true);
+                                }
+                            }
+                        });
+                    });
+
+                    // Event listener untuk tombol edit nama
                     document.querySelectorAll('.edit-name-btn').forEach(btn => {
                         btn.addEventListener('click', (e) => {
                             e.stopPropagation();
@@ -154,7 +192,6 @@
                             const editForm = cell.querySelector('.edit-name-form');
                             const editInput = editForm.querySelector('.edit-name-input');
                             
-                            // Sembunyikan teks dan tombol edit, tampilkan form
                             textSpan.classList.add('hidden');
                             btn.classList.add('hidden');
                             editForm.classList.remove('hidden');
@@ -176,17 +213,15 @@
                             }
                             
                             try {
-                                // Simpan custom name ke dokumen user di field projectCustomNames
                                 const userDocRef = doc(db, "users", user.uid);
-                                const updatedCustomNames = { ...customNames };
+                                const userSnap = await getDoc(userDocRef);
+                                const currentCustomNames = userSnap.data()?.projectCustomNames || {};
+                                const updatedCustomNames = { ...currentCustomNames };
                                 updatedCustomNames[code] = newName;
                                 await updateDoc(userDocRef, { projectCustomNames: updatedCustomNames });
                                 
-                                // Update tampilan tanpa reload semua data
                                 const textSpan = cell.querySelector('.project-name-text');
                                 textSpan.textContent = newName;
-                                
-                                // Kembalikan ke mode tampilan
                                 textSpan.classList.remove('hidden');
                                 const editBtn = cell.querySelector('.edit-name-btn');
                                 editBtn.classList.remove('hidden');
@@ -228,7 +263,7 @@
             }
             code = code.trim();
             try {
-                // 1. Validasi: cek apakah kode ada di koleksi products (dikelola admin)
+                // Validasi: cek apakah kode ada di koleksi products
                 const productDocRef = doc(db, "products", code);
                 const productSnap = await getDoc(productDocRef);
                 if (!productSnap.exists()) {
@@ -236,22 +271,21 @@
                     return;
                 }
 
-                // 2. Cek apakah user sudah memiliki kode tersebut
+                // Cek apakah user sudah memiliki kode tersebut
                 const userDocRef = doc(db, "users", user.uid);
                 const userSnap = await getDoc(userDocRef);
-                let userData = userSnap.exists() ? userSnap.data() : { projects: [], projectCustomNames: {} };
+                let userData = userSnap.exists() ? userSnap.data() : { projects: [] };
                 const projects = userData.projects || [];
                 if (projects.includes(code)) {
                     showMessage(`Anda sudah memiliki proyek dengan kode "${code}".`, true);
                     return;
                 }
 
-                // 3. Tambahkan ke array projects user (tanpa custom name dulu)
+                // Tambahkan ke array projects user
                 await updateDoc(userDocRef, {
                     projects: arrayUnion(code)
                 });
                 showMessage(`Proyek "${code}" berhasil ditambahkan!`, false);
-                // Refresh tampilan
                 await loadUserDashboard(user);
             } catch (error) {
                 showMessage(`Gagal menambahkan proyek: ${error.message}`, true);
@@ -267,15 +301,12 @@
         // Cek status autentikasi
         onAuthStateChanged(auth, async (user) => {
             if (user && user.email !== ADMIN_EMAIL) {
-                // User biasa, tampilkan dashboard
                 loadingDiv.style.display = 'none';
                 contentDiv.style.display = 'block';
                 await loadUserDashboard(user);
             } else if (user && user.email === ADMIN_EMAIL) {
-                // Admin, redirect ke dashboard admin
                 window.location.href = 'dashboard_admin.html';
             } else {
-                // Belum login, redirect ke halaman login
                 window.location.href = 'index.html';
             }
         });
@@ -317,7 +348,7 @@
             border-radius: 2rem;
             box-shadow: 0 20px 35px -12px rgba(0, 0, 0, 0.2);
             width: 100%;
-            max-width: 1000px;
+            max-width: 1100px;
             padding: 2rem;
             backdrop-filter: blur(4px);
         }
@@ -409,6 +440,15 @@
 
         .open-project-btn {
             background: #2c7da0;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .delete-project-btn {
+            background: #c0392b;
+            padding: 0.3rem 0.8rem;
+            font-size: 0.9rem;
         }
 
         .status-active {
@@ -479,7 +519,6 @@
             color: #4a627a;
         }
 
-        /* Gaya untuk kolom nama projek dan edit */
         .project-name-cell {
             display: flex;
             align-items: center;
@@ -587,10 +626,11 @@
                     <th>Kode Proyek</th>
                     <th>Akses Dashboard</th>
                     <th>Status</th>
+                    <th>Hapus</th>
                 </tr>
             </thead>
             <tbody id="projectsTableBody">
-                <tr><td colspan="4">Memuat...</td></tr>
+                <tr><td colspan="5">Memuat...</td></tr>
             </tbody>
         </table>
 
@@ -607,7 +647,7 @@
         <div id="message" class="message"></div>
         <button id="logoutBtn" class="logout-btn">Logout</button>
         <footer>
-            <i class="fas fa-info-circle"></i> Hanya kode proyek yang sudah didaftarkan admin yang dapat ditambahkan. Anda dapat mengedit nama projek sesuai keinginan.
+            <i class="fas fa-info-circle"></i> Hanya kode proyek yang sudah didaftarkan admin yang dapat ditambahkan. Anda dapat mengedit nama projek atau menghapus proyek kapan saja.
         </footer>
     </div>
 </div>
