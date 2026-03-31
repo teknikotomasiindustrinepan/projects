@@ -63,47 +63,47 @@
             });
         }
 
-        // ======================= FUNGSI PENGHAPUSAN PRODUK (HANYA UNTUK ADMIN DI PRODUK) =======================
-        // Hapus kode produk dari semua user (projects & customNames) - untuk penghapusan produk permanen
-        async function removeCodeFromAllUsers(code) {
-            const usersRef = collection(db, "users");
-            const snapshot = await getDocs(usersRef);
-            for (const docSnap of snapshot.docs) {
-                const userId = docSnap.id;
-                const userRef = doc(db, "users", userId);
-                const userData = docSnap.data();
-                
-                // Hapus dari projects jika ada
-                let projects = userData.projects || [];
-                if (projects.includes(code)) {
-                    await updateDoc(userRef, { projects: arrayRemove(code) });
-                }
-                
-                // Hapus dari projectCustomNames jika ada
-                let customNames = userData.projectCustomNames || {};
-                if (customNames[code]) {
-                    delete customNames[code];
-                    await updateDoc(userRef, { projectCustomNames: customNames });
-                }
-            }
-        }
-
-        // Hapus kode produk dari satu user (tanpa menyentuh produk global)
+        // ======================= FUNGSI PENGHAPUSAN (KHUSUS USER) =======================
+        // Hapus kode produk dari satu user secara total (projects, customNames, dan field legacy)
         async function removeCodeFromUser(userId, code) {
             const userRef = doc(db, "users", userId);
             const userSnap = await getDoc(userRef);
             if (!userSnap.exists()) return;
             const userData = userSnap.data();
             
+            // 1. Hapus dari projects (array utama)
             let projects = userData.projects || [];
             if (projects.includes(code)) {
                 await updateDoc(userRef, { projects: arrayRemove(code) });
             }
             
+            // 2. Hapus dari projectCustomNames (nama custom user)
             let customNames = userData.projectCustomNames || {};
             if (customNames[code]) {
                 delete customNames[code];
                 await updateDoc(userRef, { projectCustomNames: customNames });
+            }
+            
+            // 3. Hapus dari field legacy productCode (string)
+            if (userData.productCode === code) {
+                await updateDoc(userRef, { productCode: null });
+            }
+            
+            // 4. Hapus dari field legacy productCodes (array)
+            let productCodes = userData.productCodes || [];
+            if (productCodes.includes(code)) {
+                productCodes = productCodes.filter(c => c !== code);
+                await updateDoc(userRef, { productCodes: productCodes });
+            }
+        }
+
+        // Hapus kode produk dari semua user (untuk penghapusan produk permanen)
+        async function removeCodeFromAllUsers(code) {
+            const usersRef = collection(db, "users");
+            const snapshot = await getDocs(usersRef);
+            for (const docSnap of snapshot.docs) {
+                const userId = docSnap.id;
+                await removeCodeFromUser(userId, code);
             }
         }
 
@@ -114,7 +114,7 @@
                 const productRef = doc(db, "products", code);
                 await deleteDoc(productRef);
                 
-                // 2. Hapus kode dari semua user (projects & customNames)
+                // 2. Hapus kode dari semua user (projects, customNames, legacy)
                 await removeCodeFromAllUsers(code);
                 
                 showMessage(`Produk "${code}" dan semua data terkait berhasil dihapus`, false);
@@ -124,15 +124,14 @@
         }
 
         // ======================= LOAD USERS =======================
-        // Memuat semua user beserta daftar proyek mereka
         async function loadUsers() {
             try {
                 const usersRef = collection(db, "users");
                 const snapshot = await getDocs(usersRef);
                 userTableBody.innerHTML = '';
                 
-                // Kumpulkan semua produk dulu untuk mendapatkan nama default
-                const productsMap = new Map(); // code -> { name, link }
+                // Kumpulkan semua produk untuk mendapatkan nama default
+                const productsMap = new Map();
                 const productsSnapshot = await getDocs(collection(db, "products"));
                 productsSnapshot.forEach(docSnap => {
                     productsMap.set(docSnap.id, {
@@ -146,13 +145,12 @@
                     const userId = docSnap.id;
                     const email = userData.email || 'Email tidak tersedia';
                     
-                    // Ambil daftar proyek (array of codes)
+                    // Ambil daftar proyek dari berbagai field (prioritas: projects)
                     let projects = userData.projects || [];
-                    // Kompatibilitas dengan struktur lama (productCode)
+                    // Kompatibilitas dengan legacy
                     if (userData.productCode && !projects.includes(userData.productCode)) {
                         projects.push(userData.productCode);
                     }
-                    // Kompatibilitas dengan productCodes array
                     if (userData.productCodes && Array.isArray(userData.productCodes)) {
                         userData.productCodes.forEach(code => {
                             if (!projects.includes(code)) projects.push(code);
@@ -161,7 +159,6 @@
                     
                     const customNames = userData.projectCustomNames || {};
                     
-                    // Buat baris user
                     const row = document.createElement('tr');
                     row.setAttribute('data-userid', userId);
                     row.innerHTML = `
@@ -178,7 +175,6 @@
                     const projectsContainer = document.getElementById(`projects-${userId}`);
                     if (!projectsContainer) continue;
                     
-                    // Tampilkan setiap proyek
                     if (projects.length === 0) {
                         projectsContainer.innerHTML = '<span class="no-projects">Tidak ada proyek</span>';
                     } else {
@@ -201,7 +197,7 @@
                     }
                 }
                 
-                // Pasang event listener untuk tombol hapus proyek (hanya hapus dari user, tidak menghapus produk)
+                // Event listener tombol hapus proyek (hanya hapus dari user)
                 document.querySelectorAll('.remove-project-btn').forEach(btn => {
                     btn.addEventListener('click', async (e) => {
                         e.stopPropagation();
@@ -211,10 +207,9 @@
                             try {
                                 await removeCodeFromUser(userId, code);
                                 showMessage(`Proyek "${code}" berhasil dihapus dari user.`, false);
-                                
-                                // Reload user dan produk (produk tidak ikut terhapus)
+                                // Refresh tampilan
                                 await loadUsers();
-                                await loadProducts(); // hanya untuk refresh link/nama produk, tidak menghapus
+                                await loadProducts(); // refresh produk (tetap ada)
                             } catch (error) {
                                 showMessage(`Gagal hapus: ${error.message}`, true);
                             }
@@ -222,11 +217,10 @@
                     });
                 });
                 
-                // Pasang event listener untuk tombol tambah proyek
+                // Event listener tombol tambah proyek
                 document.querySelectorAll('.add-project-btn').forEach(btn => {
                     btn.addEventListener('click', async (e) => {
                         const userId = btn.getAttribute('data-userid');
-                        // Buat form inline untuk input kode
                         const actionCell = btn.closest('td');
                         const existingForm = actionCell.querySelector('.add-project-form');
                         if (existingForm) {
@@ -256,7 +250,7 @@
                                 return;
                             }
                             try {
-                                // Validasi apakah kode ada di koleksi products
+                                // Validasi kode ada di koleksi products
                                 const productRef = doc(db, "products", code);
                                 const productSnap = await getDoc(productRef);
                                 if (!productSnap.exists()) {
@@ -265,7 +259,6 @@
                                     return;
                                 }
                                 
-                                // Ambil user document
                                 const userRef = doc(db, "users", userId);
                                 const userSnap = await getDoc(userRef);
                                 let userProjects = userSnap.data()?.projects || [];
@@ -275,13 +268,12 @@
                                     return;
                                 }
                                 
-                                // Tambahkan kode ke user.projects
                                 await updateDoc(userRef, {
                                     projects: arrayUnion(code)
                                 });
                                 
                                 showMessage(`Proyek "${code}" berhasil ditambahkan ke user`, false);
-                                await loadUsers(); // refresh
+                                await loadUsers();
                                 await loadProducts();
                                 formDiv.remove();
                             } catch (error) {
@@ -301,7 +293,6 @@
         // ======================= LOAD PRODUCTS =======================
         async function loadProducts() {
             try {
-                // Kumpulkan semua kode produk dari koleksi products
                 const productsSnapshot = await getDocs(collection(db, "products"));
                 const productCodes = [];
                 const productData = new Map();
@@ -347,15 +338,14 @@
                             const productRef = doc(db, "products", code);
                             await setDoc(productRef, { name: newName, link: newLink }, { merge: true });
                             showMessage(`Data produk ${code} berhasil disimpan`, false);
-                            // Refresh user untuk menampilkan nama terbaru (bagi user yang belum punya custom name)
-                            await loadUsers();
+                            await loadUsers(); // update tampilan user jika ada perubahan nama default
                         } catch (error) {
                             showMessage(`Gagal simpan: ${error.message}`, true);
                         }
                     });
                 });
                 
-                // Hapus produk (menghapus seluruh data produk dari semua user dan products)
+                // Hapus produk permanen
                 document.querySelectorAll('.delete-product-btn').forEach(btn => {
                     btn.addEventListener('click', async () => {
                         const code = btn.getAttribute('data-code');
@@ -524,7 +514,6 @@
             color: #1f3b4c;
         }
 
-        /* User management styles */
         .projects-list {
             display: flex;
             flex-direction: column;
@@ -593,7 +582,6 @@
             background: #7f8c8d;
         }
 
-        /* Product management styles */
         .project-name-input, .link-input {
             width: 100%;
             padding: 0.4rem;
