@@ -255,7 +255,13 @@
         }
 
         body {
-            background: #f5f7fa;  /* off-white */
+            /* Background image dengan overlay gelap agar teks tetap terbaca */
+            background-image: url('background_link.png');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            background-repeat: no-repeat;
+            position: relative;
             min-height: 100vh;
             display: flex;
             align-items: center;
@@ -263,10 +269,25 @@
             padding: 2rem 1.5rem;
         }
 
+        /* Overlay semi-transparan untuk efek "invisible" agar tulisan tetap terbaca */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.55); /* Gelap 55% */
+            backdrop-filter: blur(2px); /* sedikit blur untuk mengurangi kontras background */
+            z-index: -1;
+        }
+
         .main-wrapper {
             max-width: 1100px;
             width: 100%;
             margin: 0 auto;
+            position: relative;
+            z-index: 1;
         }
 
         /* Branding area */
@@ -275,6 +296,7 @@
             margin-bottom: 2rem;
         }
 
+        /* Container logo dengan ukuran kotak seragam */
         .logo-row {
             display: flex;
             justify-content: center;
@@ -284,61 +306,100 @@
             margin-bottom: 2rem;
         }
 
+        /* Setiap kotak logo memiliki ukuran yang seragam: lebar 180px, tinggi 100px */
         .logo-item {
             display: flex;
             justify-content: center;
             align-items: center;
-            background: white;
-            border-radius: 2rem;
-            padding: 1rem 1.5rem;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
-            transition: transform 0.2s;
+            background: rgba(255, 255, 255, 0.92); /* sedikit transparan agar menyatu dengan background */
+            border-radius: 1.5rem;
+            padding: 1rem;
+            width: 180px;
+            height: 100px;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+            backdrop-filter: blur(2px);
         }
 
         .logo-item:hover {
-            transform: translateY(-3px);
+            transform: translateY(-5px);
+            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.15);
         }
 
+        /* Pengaturan dasar gambar agar proporsional dalam kotak */
         .logo-item img {
-            max-height: 60px;
+            max-width: 100%;
+            max-height: 100%;
             width: auto;
+            height: auto;
             object-fit: contain;
+            transition: transform 0.2s;
         }
 
+        /* Perbesar logo Schneider dan Rasti 2x (dalam kotak yang tetap seragam) */
+        /* Untuk Schneider */
+        .logo-item:nth-child(1) img {
+            transform: scale(2);
+            /* Agar scaling tidak overflow, pastikan container menampung dengan padding */
+            max-width: 90%;
+            max-height: 90%;
+        }
+        /* Untuk Rasti (indeks ke-3) */
+        .logo-item:nth-child(3) img {
+            transform: scale(2);
+            max-width: 90%;
+            max-height: 90%;
+        }
+
+        /* Untuk logo Japara tetap normal (tidak discale) */
+        .logo-item:nth-child(2) img {
+            transform: scale(1);
+        }
+
+        /* Brand title dengan efek glassmorphism agar lebih terbaca di atas background */
         .brand-title {
             font-size: 3.2rem;
             font-weight: 800;
             letter-spacing: -0.02em;
-            background: linear-gradient(135deg, #1A4D2A, #2C5E3A);
+            background: linear-gradient(135deg, #F5F7FA, #E0F2E9);
             background-clip: text;
             -webkit-background-clip: text;
             color: transparent;
+            text-shadow: 0 2px 5px rgba(0,0,0,0.2);
             margin-bottom: 1rem;
         }
 
         .description {
             font-size: 1rem;
-            color: #4a627a;
+            color: #ffffff; /* putih terang agar kontras dengan overlay gelap */
             max-width: 700px;
             margin: 0 auto;
             line-height: 1.6;
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(4px);
+            padding: 0.8rem 1.5rem;
+            border-radius: 2rem;
+            display: inline-block;
+            width: auto;
         }
 
         .description p {
             margin-bottom: 0.25rem;
+            font-weight: 500;
         }
 
-        /* Card login (elegan, minimalis) */
+        /* Card login (elegan, semi-transparan dengan efek glassmorphism agar tetap readable) */
         .glass-card {
-            background: rgba(255, 255, 255, 0.96);
+            background: rgba(255, 255, 255, 0.92);
             border-radius: 2rem;
-            box-shadow: 0 20px 35px -12px rgba(0, 0, 0, 0.08);
+            box-shadow: 0 25px 45px -12px rgba(0, 0, 0, 0.25);
             width: 100%;
             max-width: 500px;
             margin: 2rem auto 0 auto;
             padding: 2rem;
             transition: all 0.2s ease;
-            border: 1px solid rgba(0,0,0,0.05);
+            border: 1px solid rgba(255,255,255,0.3);
+            backdrop-filter: blur(2px);
         }
 
         /* Hilangkan judul dashboard */
@@ -488,14 +549,21 @@
             border-color: #dce5f0;
         }
 
-        /* Footer baru di luar card */
+        /* Footer baru di luar card dengan transparansi */
         .global-footer {
             text-align: center;
             font-size: 0.75rem;
-            color: #6c7a8e;
+            color: #f0f0f0;
             margin-top: 2rem;
             padding-top: 1rem;
-            border-top: 1px solid #e2e8f0;
+            border-top: 1px solid rgba(255,255,255,0.3);
+            background: rgba(0,0,0,0.3);
+            backdrop-filter: blur(4px);
+            border-radius: 2rem;
+            padding: 0.8rem;
+            width: fit-content;
+            margin-left: auto;
+            margin-right: auto;
         }
 
         @media (max-width: 640px) {
@@ -503,10 +571,16 @@
                 font-size: 2.4rem;
             }
             .logo-item {
-                padding: 0.6rem 1rem;
+                width: 140px;
+                height: 80px;
+                padding: 0.6rem;
             }
-            .logo-item img {
-                max-height: 40px;
+            /* Untuk mobile, scaling 2x mungkin overflow, kita kurangi sedikit max-width/height */
+            .logo-item:nth-child(1) img,
+            .logo-item:nth-child(3) img {
+                transform: scale(1.6);
+                max-width: 85%;
+                max-height: 85%;
             }
             .logo-row {
                 gap: 1rem;
@@ -514,6 +588,25 @@
             .glass-card {
                 padding: 1.5rem;
                 margin-top: 1.5rem;
+            }
+            .description {
+                font-size: 0.9rem;
+                padding: 0.5rem 1rem;
+            }
+        }
+
+        /* Untuk layar sangat kecil */
+        @media (max-width: 480px) {
+            .logo-item {
+                width: 110px;
+                height: 70px;
+            }
+            .logo-item:nth-child(1) img,
+            .logo-item:nth-child(3) img {
+                transform: scale(1.4);
+            }
+            .brand-title {
+                font-size: 2rem;
             }
         }
     </style>
@@ -524,13 +617,13 @@
     <div class="branding">
         <div class="logo-row">
             <div class="logo-item">
-                <img src="schneider.png" alt="Schneider Electric" onerror="this.src='https://placehold.co/120x60?text=Schneider'">
+                <img src="schneider.png" alt="Schneider Electric" onerror="this.src='https://placehold.co/180x100?text=Schneider'">
             </div>
             <div class="logo-item">
-                <img src="japara.png" alt="SMK Negeri 1 Japara" onerror="this.src='https://placehold.co/120x60?text=Japara'">
+                <img src="japara.png" alt="SMK Negeri 1 Japara" onerror="this.src='https://placehold.co/180x100?text=Japara'">
             </div>
             <div class="logo-item">
-                <img src="rasti.png" alt="PT. Rasti Global Innovation" onerror="this.src='https://placehold.co/120x60?text=Rasti'">
+                <img src="rasti.png" alt="PT. Rasti Global Innovation" onerror="this.src='https://placehold.co/180x100?text=Rasti'">
             </div>
         </div>
         <div class="brand-title">AGRIOT - CLASSY</div>
