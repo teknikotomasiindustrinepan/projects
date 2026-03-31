@@ -29,7 +29,7 @@
         const ADMIN_EMAIL = "teknikotomasiindustri.nepan@gmail.com";
 
         // DOM elements
-        const userTableBody = document.getElementById('userTableBody');
+        const usersContainer = document.getElementById('usersContainer');
         const productTableBody = document.getElementById('productTableBody');
         const logoutBtn = document.getElementById('logoutBtn');
         const loadingDiv = document.getElementById('loading');
@@ -64,32 +64,27 @@
         }
 
         // ======================= FUNGSI PENGHAPUSAN (KHUSUS USER) =======================
-        // Hapus kode produk dari satu user secara total (projects, customNames, dan field legacy)
         async function removeCodeFromUser(userId, code) {
             const userRef = doc(db, "users", userId);
             const userSnap = await getDoc(userRef);
             if (!userSnap.exists()) return;
             const userData = userSnap.data();
             
-            // 1. Hapus dari projects (array utama)
             let projects = userData.projects || [];
             if (projects.includes(code)) {
                 await updateDoc(userRef, { projects: arrayRemove(code) });
             }
             
-            // 2. Hapus dari projectCustomNames (nama custom user)
             let customNames = userData.projectCustomNames || {};
             if (customNames[code]) {
                 delete customNames[code];
                 await updateDoc(userRef, { projectCustomNames: customNames });
             }
             
-            // 3. Hapus dari field legacy productCode (string)
             if (userData.productCode === code) {
                 await updateDoc(userRef, { productCode: null });
             }
             
-            // 4. Hapus dari field legacy productCodes (array)
             let productCodes = userData.productCodes || [];
             if (productCodes.includes(code)) {
                 productCodes = productCodes.filter(c => c !== code);
@@ -97,38 +92,31 @@
             }
         }
 
-        // Hapus kode produk dari semua user (untuk penghapusan produk permanen)
         async function removeCodeFromAllUsers(code) {
             const usersRef = collection(db, "users");
             const snapshot = await getDocs(usersRef);
             for (const docSnap of snapshot.docs) {
-                const userId = docSnap.id;
-                await removeCodeFromUser(userId, code);
+                await removeCodeFromUser(docSnap.id, code);
             }
         }
 
-        // Hapus seluruh data produk (termasuk dari semua user dan dokumen products) - hanya untuk tombol "Hapus Produk"
         async function deleteProductCompletely(code) {
             try {
-                // 1. Hapus dokumen produk di koleksi products
                 const productRef = doc(db, "products", code);
                 await deleteDoc(productRef);
-                
-                // 2. Hapus kode dari semua user (projects, customNames, legacy)
                 await removeCodeFromAllUsers(code);
-                
                 showMessage(`Produk "${code}" dan semua data terkait berhasil dihapus`, false);
             } catch (error) {
                 throw new Error(`Gagal menghapus produk: ${error.message}`);
             }
         }
 
-        // ======================= LOAD USERS =======================
+        // ======================= LOAD USERS (CARD LAYOUT) =======================
         async function loadUsers() {
             try {
                 const usersRef = collection(db, "users");
                 const snapshot = await getDocs(usersRef);
-                userTableBody.innerHTML = '';
+                usersContainer.innerHTML = '';
                 
                 // Kumpulkan semua produk untuk mendapatkan nama default
                 const productsMap = new Map();
@@ -145,9 +133,7 @@
                     const userId = docSnap.id;
                     const email = userData.email || 'Email tidak tersedia';
                     
-                    // Ambil daftar proyek dari berbagai field (prioritas: projects)
                     let projects = userData.projects || [];
-                    // Kompatibilitas dengan legacy
                     if (userData.productCode && !projects.includes(userData.productCode)) {
                         projects.push(userData.productCode);
                     }
@@ -159,45 +145,54 @@
                     
                     const customNames = userData.projectCustomNames || {};
                     
-                    const row = document.createElement('tr');
-                    row.setAttribute('data-userid', userId);
-                    row.innerHTML = `
-                        <td data-label="Email" class="user-email-cell">${escapeHtml(email)}</td>
-                        <td data-label="Proyek" class="projects-cell">
-                            <div class="projects-list" id="projects-${userId}"></div>
-                        </td>
-                        <td data-label="Aksi">
-                            <button class="add-project-btn" data-userid="${userId}">+ Tambah Proyek</button>
-                        </td>
-                    `;
-                    userTableBody.appendChild(row);
+                    // Buat card user
+                    const card = document.createElement('div');
+                    card.className = 'user-card';
+                    card.setAttribute('data-userid', userId);
                     
-                    const projectsContainer = document.getElementById(`projects-${userId}`);
-                    if (!projectsContainer) continue;
+                    // Header card: email
+                    const header = document.createElement('div');
+                    header.className = 'user-card-header';
+                    header.innerHTML = `<i class="fas fa-user-circle"></i> ${escapeHtml(email)}`;
+                    card.appendChild(header);
                     
+                    // Body: daftar proyek
+                    const projectsDiv = document.createElement('div');
+                    projectsDiv.className = 'user-projects';
                     if (projects.length === 0) {
-                        projectsContainer.innerHTML = '<span class="no-projects">Tidak ada proyek</span>';
+                        projectsDiv.innerHTML = '<div class="no-projects">Tidak ada proyek</div>';
                     } else {
                         for (const code of projects) {
                             const defaultName = productsMap.get(code)?.name || code;
                             const displayName = customNames[code] ? customNames[code] : defaultName;
-                            
-                            const projectDiv = document.createElement('div');
-                            projectDiv.className = 'project-item';
-                            projectDiv.setAttribute('data-code', code);
-                            projectDiv.innerHTML = `
+                            const projectItem = document.createElement('div');
+                            projectItem.className = 'project-item';
+                            projectItem.innerHTML = `
                                 <div class="project-info">
                                     <span class="project-code">${escapeHtml(code)}</span>
                                     <span class="project-name">${escapeHtml(displayName)}</span>
                                 </div>
                                 <button class="remove-project-btn" data-userid="${userId}" data-code="${escapeHtml(code)}" title="Hapus proyek dari user">✖</button>
                             `;
-                            projectsContainer.appendChild(projectDiv);
+                            projectsDiv.appendChild(projectItem);
                         }
                     }
+                    card.appendChild(projectsDiv);
+                    
+                    // Footer: tombol tambah proyek
+                    const footer = document.createElement('div');
+                    footer.className = 'user-card-footer';
+                    const addBtn = document.createElement('button');
+                    addBtn.className = 'add-project-btn';
+                    addBtn.setAttribute('data-userid', userId);
+                    addBtn.innerHTML = '+ Tambah Proyek';
+                    footer.appendChild(addBtn);
+                    card.appendChild(footer);
+                    
+                    usersContainer.appendChild(card);
                 }
                 
-                // Event listener tombol hapus proyek (hanya hapus dari user)
+                // Event listener untuk tombol hapus proyek
                 document.querySelectorAll('.remove-project-btn').forEach(btn => {
                     btn.addEventListener('click', async (e) => {
                         e.stopPropagation();
@@ -207,9 +202,8 @@
                             try {
                                 await removeCodeFromUser(userId, code);
                                 showMessage(`Proyek "${code}" berhasil dihapus dari user.`, false);
-                                // Refresh tampilan
                                 await loadUsers();
-                                await loadProducts(); // refresh produk (tetap ada)
+                                await loadProducts();
                             } catch (error) {
                                 showMessage(`Gagal hapus: ${error.message}`, true);
                             }
@@ -217,12 +211,12 @@
                     });
                 });
                 
-                // Event listener tombol tambah proyek
+                // Event listener untuk tombol tambah proyek (membuat form inline di dalam card)
                 document.querySelectorAll('.add-project-btn').forEach(btn => {
                     btn.addEventListener('click', async (e) => {
                         const userId = btn.getAttribute('data-userid');
-                        const actionCell = btn.closest('td');
-                        const existingForm = actionCell.querySelector('.add-project-form');
+                        const card = btn.closest('.user-card');
+                        const existingForm = card.querySelector('.add-project-form');
                         if (existingForm) {
                             existingForm.remove();
                             return;
@@ -236,7 +230,7 @@
                                 <button class="cancel-add-btn">Batal</button>
                             </div>
                         `;
-                        actionCell.appendChild(formDiv);
+                        card.appendChild(formDiv);
                         const input = formDiv.querySelector('.project-code-input');
                         input.focus();
                         
@@ -250,7 +244,6 @@
                                 return;
                             }
                             try {
-                                // Validasi kode ada di koleksi products
                                 const productRef = doc(db, "products", code);
                                 const productSnap = await getDoc(productRef);
                                 if (!productSnap.exists()) {
@@ -326,7 +319,6 @@
                     productTableBody.appendChild(row);
                 }
                 
-                // Simpan perubahan nama & link
                 document.querySelectorAll('.save-product-btn').forEach(btn => {
                     btn.addEventListener('click', async () => {
                         const code = btn.getAttribute('data-code');
@@ -338,14 +330,13 @@
                             const productRef = doc(db, "products", code);
                             await setDoc(productRef, { name: newName, link: newLink }, { merge: true });
                             showMessage(`Data produk ${code} berhasil disimpan`, false);
-                            await loadUsers(); // update tampilan user jika ada perubahan nama default
+                            await loadUsers();
                         } catch (error) {
                             showMessage(`Gagal simpan: ${error.message}`, true);
                         }
                     });
                 });
                 
-                // Hapus produk permanen
                 document.querySelectorAll('.delete-product-btn').forEach(btn => {
                     btn.addEventListener('click', async () => {
                         const code = btn.getAttribute('data-code');
@@ -431,7 +422,6 @@
             }
         });
 
-        // ======================= EVENT LISTENERS =======================
         logoutBtn.addEventListener('click', handleLogout);
         menuItems[0].addEventListener('click', () => switchSection('users'));
         menuItems[1].addEventListener('click', () => switchSection('products'));
@@ -496,6 +486,152 @@
             padding-left: 1rem;
         }
 
+        /* ========== USER CARD STYLES ========== */
+        .users-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            margin-top: 1rem;
+        }
+
+        .user-card {
+            background: white;
+            border-radius: 1.5rem;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            overflow: hidden;
+            transition: box-shadow 0.2s;
+        }
+
+        .user-card:hover {
+            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+        }
+
+        .user-card-header {
+            background: #f8fafc;
+            padding: 1rem 1.2rem;
+            font-weight: 700;
+            font-size: 1rem;
+            color: #1f3b4c;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .user-card-header i {
+            color: #2c7da0;
+        }
+
+        .user-projects {
+            padding: 1rem 1.2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .project-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f8fafc;
+            padding: 0.6rem 1rem;
+            border-radius: 1rem;
+            border: 1px solid #e2e8f0;
+        }
+
+        .project-info {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .project-code {
+            font-family: monospace;
+            font-weight: 600;
+            color: #2c7da0;
+            font-size: 0.85rem;
+        }
+
+        .project-name {
+            color: #1f3b4c;
+            font-size: 0.9rem;
+        }
+
+        .remove-project-btn {
+            background: #c0392b;
+            padding: 0.3rem 0.7rem;
+            font-size: 0.8rem;
+            border-radius: 1.5rem;
+            border: none;
+            cursor: pointer;
+            color: white;
+            font-weight: 600;
+            transition: 0.2s;
+        }
+
+        .remove-project-btn:hover {
+            background: #a82315;
+            transform: scale(0.96);
+        }
+
+        .no-projects {
+            color: #7f8c8d;
+            font-style: italic;
+            padding: 0.5rem 0;
+        }
+
+        .user-card-footer {
+            padding: 0.8rem 1.2rem 1.2rem 1.2rem;
+            border-top: 1px solid #e2e8f0;
+            background: #ffffff;
+        }
+
+        .add-project-btn {
+            background: #27ae60;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 2rem;
+            font-weight: 600;
+            cursor: pointer;
+            color: white;
+            transition: 0.2s;
+        }
+
+        .add-project-btn:hover {
+            background: #1e8e4a;
+            transform: scale(0.98);
+        }
+
+        .add-project-form {
+            margin-top: 0.8rem;
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .project-code-input {
+            flex: 2;
+            padding: 0.5rem 1rem;
+            border: 1px solid #cbd5e1;
+            border-radius: 2rem;
+            font-size: 0.9rem;
+        }
+
+        .form-buttons {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .confirm-add-btn {
+            background: #27ae60;
+        }
+        .cancel-add-btn {
+            background: #7f8c8d;
+        }
+
+        /* ========== PRODUCT TABLE STYLES ========== */
         table {
             width: 100%;
             border-collapse: collapse;
@@ -504,9 +640,9 @@
 
         th, td {
             text-align: left;
-            padding: 1rem;
+            padding: 0.75rem;
             border-bottom: 1px solid #e2e8f0;
-            vertical-align: top;
+            vertical-align: middle;
         }
 
         th {
@@ -514,87 +650,31 @@
             color: #1f3b4c;
         }
 
-        .projects-list {
-            display: flex;
-            flex-direction: column;
-            gap: 0.75rem;
-        }
-        .project-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: #f8fafc;
-            padding: 0.5rem 0.8rem;
-            border-radius: 1rem;
-            border: 1px solid #e2e8f0;
-        }
-        .project-info {
-            display: flex;
-            flex-direction: column;
-            gap: 0.25rem;
-        }
-        .project-code {
-            font-family: monospace;
-            font-weight: 600;
-            color: #2c7da0;
-            font-size: 0.85rem;
-        }
-        .project-name {
-            color: #1f3b4c;
-            font-size: 0.9rem;
-        }
-        .remove-project-btn {
-            background: #c0392b;
-            padding: 0.3rem 0.6rem;
-            font-size: 0.8rem;
-            border-radius: 1rem;
-        }
-        .no-projects {
-            color: #7f8c8d;
-            font-style: italic;
-        }
-        .add-project-btn {
-            background: #27ae60;
-            font-size: 0.85rem;
-            padding: 0.4rem 0.8rem;
-        }
-        .add-project-form {
-            margin-top: 0.5rem;
-            display: flex;
-            gap: 0.5rem;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-        .project-code-input {
-            padding: 0.4rem 0.8rem;
-            border: 1px solid #cbd5e1;
-            border-radius: 1.5rem;
-            flex: 1;
-        }
-        .form-buttons {
-            display: flex;
-            gap: 0.5rem;
-        }
-        .confirm-add-btn {
-            background: #27ae60;
-        }
-        .cancel-add-btn {
-            background: #7f8c8d;
-        }
-
         .project-name-input, .link-input {
             width: 100%;
-            padding: 0.4rem;
+            padding: 0.4rem 0.8rem;
             border: 1px solid #cbd5e1;
             border-radius: 1rem;
             font-size: 0.9rem;
+        }
+
+        .save-product-btn, .delete-product-btn {
+            padding: 0.4rem 0.8rem;
+            border-radius: 1.5rem;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            margin-right: 0.5rem;
         }
         .save-product-btn {
             background: #2c7da0;
+            color: white;
         }
         .delete-product-btn {
             background: #c0392b;
+            color: white;
         }
+
         .add-product-card {
             background: #f8fafc;
             border-radius: 1rem;
@@ -602,10 +682,12 @@
             margin-top: 1.5rem;
             border: 1px solid #e2e8f0;
         }
+
         .add-product-card h3 {
             margin-bottom: 1rem;
             color: #1f3b4c;
         }
+
         .add-product-form {
             display: flex;
             flex-wrap: wrap;
@@ -633,38 +715,41 @@
             background: #27ae60;
             margin-top: 0;
             padding: 0.6rem 1.2rem;
+            border: none;
+            border-radius: 2rem;
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
         }
 
         button {
-            background: #1f3b4c;
-            color: white;
-            border: none;
-            padding: 0.4rem 0.8rem;
-            border-radius: 2rem;
-            cursor: pointer;
-            font-weight: 600;
             transition: 0.2s;
         }
         button:hover {
-            background: #0f2b3a;
             transform: scale(0.98);
         }
+
         .logout-btn {
             position: fixed;
             top: 1rem;
             right: 1rem;
             background: #c0392b;
             z-index: 100;
+            padding: 0.5rem 1rem;
+            border-radius: 2rem;
+            border: none;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
         }
-        .logout-btn:hover {
-            background: #a82315;
-        }
+
         #loading {
             text-align: center;
             margin-top: 2rem;
             font-size: 1.2rem;
             color: #2c3e66;
         }
+
         .message {
             position: fixed;
             bottom: 1rem;
@@ -677,11 +762,13 @@
             background: white;
             box-shadow: 0 4px 12px rgba(0,0,0,0.2);
         }
+
         .error {
             background: #ffe6e6;
             color: #c0392b;
             border-left: 4px solid #c0392b;
         }
+
         .success {
             background: #e0f2e9;
             color: #1e6f3f;
@@ -692,6 +779,18 @@
             .menu-bar {
                 flex-direction: column;
                 align-items: center;
+            }
+            .add-product-form {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .project-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.5rem;
+            }
+            .remove-project-btn {
+                align-self: flex-end;
             }
             table, thead, tbody, th, td, tr {
                 display: block;
@@ -710,18 +809,6 @@
                 left: 0.75rem;
                 font-weight: bold;
             }
-            .add-product-form {
-                flex-direction: column;
-                align-items: stretch;
-            }
-            .project-item {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 0.5rem;
-            }
-            .remove-project-btn {
-                align-self: flex-end;
-            }
         }
     </style>
 </head>
@@ -736,12 +823,7 @@
         <div class="container">
             <div id="usersSection" class="section">
                 <h2>Daftar User & Proyek</h2>
-                <table>
-                    <thead>
-                        <tr><th>Email</th><th>Proyek (kode & nama)</th><th>Aksi</th></tr>
-                    </thead>
-                    <tbody id="userTableBody"></tbody>
-                </table>
+                <div id="usersContainer" class="users-grid"></div>
             </div>
             <div id="productsSection" class="section" style="display: none;">
                 <h2>Manajemen Produk</h2>
