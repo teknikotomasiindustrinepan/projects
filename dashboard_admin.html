@@ -64,7 +64,7 @@
         }
 
         // ======================= FUNGSI PENGHAPUSAN PRODUK =======================
-        // Hapus kode produk dari semua user (projects & productCodes)
+        // Hapus kode produk dari semua user (projects & customNames)
         async function removeCodeFromAllUsers(code) {
             const usersRef = collection(db, "users");
             const snapshot = await getDocs(usersRef);
@@ -84,13 +84,6 @@
                 if (customNames[code]) {
                     delete customNames[code];
                     await updateDoc(userRef, { projectCustomNames: customNames });
-                }
-                
-                // Hapus dari productCodes jika masih ada (legacy)
-                let productCodes = userData.productCodes || [];
-                if (productCodes.includes(code)) {
-                    productCodes = productCodes.filter(c => c !== code);
-                    await updateDoc(userRef, { productCodes: productCodes });
                 }
             }
         }
@@ -155,11 +148,11 @@
                     
                     // Ambil daftar proyek (array of codes)
                     let projects = userData.projects || [];
-                    // Untuk kompatibilitas dengan struktur lama (productCode)
+                    // Kompatibilitas dengan struktur lama (productCode)
                     if (userData.productCode && !projects.includes(userData.productCode)) {
                         projects.push(userData.productCode);
                     }
-                    // Untuk kompatibilitas dengan productCodes array
+                    // Kompatibilitas dengan productCodes array
                     if (userData.productCodes && Array.isArray(userData.productCodes)) {
                         userData.productCodes.forEach(code => {
                             if (!projects.includes(code)) projects.push(code);
@@ -377,7 +370,7 @@
                             const productRef = doc(db, "products", code);
                             await setDoc(productRef, { name: newName, link: newLink }, { merge: true });
                             showMessage(`Data produk ${code} berhasil disimpan`, false);
-                            // Refresh user untuk menampilkan nama terbaru
+                            // Refresh user untuk menampilkan nama terbaru (bagi user yang belum punya custom name)
                             await loadUsers();
                         } catch (error) {
                             showMessage(`Gagal simpan: ${error.message}`, true);
