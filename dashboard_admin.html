@@ -19,7 +19,7 @@
 
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
         import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
-        import { getFirestore, collection, getDocs, doc, updateDoc, deleteDoc, setDoc, getDoc, arrayRemove } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
+        import { getFirestore, collection, getDocs, doc, updateDoc, deleteDoc, setDoc, getDoc, arrayRemove, query, where } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
@@ -40,6 +40,7 @@
             users: document.getElementById('usersSection'),
             products: document.getElementById('productsSection')
         };
+        const addProductForm = document.getElementById('addProductForm');
 
         // Helper: tampilkan pesan
         function showMessage(text, isError = true) {
@@ -94,14 +95,12 @@
             if (!userSnap.exists()) return;
             const userData = userSnap.data();
             
-            // Hapus dari productCodes
             let productCodes = userData.productCodes || [];
             if (productCodes.includes(code)) {
                 productCodes = productCodes.filter(c => c !== code);
                 await updateDoc(userRef, { productCodes: productCodes });
             }
             
-            // Hapus dari projects
             let projects = userData.projects || [];
             if (projects.includes(code)) {
                 await updateDoc(userRef, { projects: arrayRemove(code) });
@@ -285,14 +284,13 @@
                 });
             });
             
-            // Hapus (perbaiki agar menghapus produk sepenuhnya jika tidak ada user lain yang punya)
+            // Hapus
             document.querySelectorAll('.delete-code-btn').forEach(btn => {
                 btn.addEventListener('click', async () => {
                     const userId = btn.getAttribute('data-userid');
                     const code = btn.getAttribute('data-code');
                     if (confirm(`Hapus kode "${code}" untuk user ini?`)) {
                         try {
-                            // Hapus dari user ini
                             await removeCodeFromUser(userId, code);
                             
                             // Cek apakah masih ada user lain yang memiliki kode ini
@@ -335,11 +333,11 @@
         // ======================= LOAD PRODUCTS =======================
         async function loadProducts() {
             try {
-                // Ambil semua user, kumpulkan kode produk unik
+                // Kumpulkan semua kode produk dari user (yang sedang digunakan)
                 const usersRef = collection(db, "users");
-                const snapshot = await getDocs(usersRef);
+                const usersSnapshot = await getDocs(usersRef);
                 const productCodesSet = new Set();
-                snapshot.forEach(docSnap => {
+                usersSnapshot.forEach(docSnap => {
                     const userData = docSnap.data();
                     let codes = [];
                     if (userData.productCodes && Array.isArray(userData.productCodes)) {
@@ -353,44 +351,61 @@
                         }
                     });
                 });
+                
+                // Tambahkan juga semua kode dari koleksi products (termasuk yang belum dipakai)
+                const productsSnapshot = await getDocs(collection(db, "products"));
+                productsSnapshot.forEach(docSnap => {
+                    productCodesSet.add(docSnap.id);
+                });
+                
                 const productCodes = Array.from(productCodesSet).sort();
-
+                
                 productTableBody.innerHTML = '';
                 for (const code of productCodes) {
                     const productRef = doc(db, "products", code);
                     const productSnap = await getDoc(productRef);
-                    const link = productSnap.exists() ? (productSnap.data().link || '') : '';
+                    let name = '';
+                    let link = '';
+                    if (productSnap.exists()) {
+                        name = productSnap.data().name || '';
+                        link = productSnap.data().link || '';
+                    }
                     
                     const row = document.createElement('tr');
                     row.innerHTML = `
                         <td data-label="Kode Produk">${escapeHtml(code)}</td>
+                        <td data-label="Nama Projek">
+                            <input type="text" id="name-${code}" value="${escapeHtml(name)}" placeholder="Nama projek" class="project-name-input">
+                        </td>
                         <td data-label="Link">
                             <input type="url" id="link-${code}" value="${escapeHtml(link)}" placeholder="https://..." class="link-input">
                         </td>
                         <td data-label="Aksi">
-                            <button class="save-product-btn" data-code="${code}">💾 Simpan Link</button>
-                            <button class="delete-product-btn" data-code="${code}">🗑️ Hapus Produk (seluruh data)</button>
+                            <button class="save-product-btn" data-code="${code}">💾 Simpan</button>
+                            <button class="delete-product-btn" data-code="${code}">🗑️ Hapus Produk</button>
                         </td>
                     `;
                     productTableBody.appendChild(row);
                 }
-
-                // Simpan link
+                
+                // Simpan perubahan nama & link
                 document.querySelectorAll('.save-product-btn').forEach(btn => {
                     btn.addEventListener('click', async () => {
                         const code = btn.getAttribute('data-code');
+                        const nameInput = document.getElementById(`name-${code}`);
                         const linkInput = document.getElementById(`link-${code}`);
+                        const newName = nameInput.value.trim();
                         const newLink = linkInput.value.trim();
                         try {
                             const productRef = doc(db, "products", code);
-                            await setDoc(productRef, { link: newLink }, { merge: true });
-                            showMessage(`Link untuk produk ${code} berhasil disimpan`, false);
+                            await setDoc(productRef, { name: newName, link: newLink }, { merge: true });
+                            showMessage(`Data produk ${code} berhasil disimpan`, false);
                         } catch (error) {
-                            showMessage(`Gagal simpan link: ${error.message}`, true);
+                            showMessage(`Gagal simpan: ${error.message}`, true);
                         }
                     });
                 });
-
+                
                 // Hapus produk (menghapus seluruh data produk)
                 document.querySelectorAll('.delete-product-btn').forEach(btn => {
                     btn.addEventListener('click', async () => {
@@ -411,6 +426,37 @@
                 console.error(error);
             }
         }
+        
+        // ======================= TAMBAH PRODUK BARU =======================
+        addProductForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const code = document.getElementById('newProductCode').value.trim();
+            const name = document.getElementById('newProductName').value.trim();
+            const link = document.getElementById('newProductLink').value.trim();
+            
+            if (!code) {
+                showMessage('Kode produk wajib diisi', true);
+                return;
+            }
+            
+            try {
+                const productRef = doc(db, "products", code);
+                const productSnap = await getDoc(productRef);
+                if (productSnap.exists()) {
+                    showMessage(`Produk dengan kode "${code}" sudah ada.`, true);
+                    return;
+                }
+                await setDoc(productRef, { name, link });
+                showMessage(`Produk baru "${code}" berhasil ditambahkan`, false);
+                // Reset form
+                document.getElementById('newProductCode').value = '';
+                document.getElementById('newProductName').value = '';
+                document.getElementById('newProductLink').value = '';
+                loadProducts();
+            } catch (error) {
+                showMessage(`Gagal menambah produk: ${error.message}`, true);
+            }
+        });
 
         // ======================= LOGOUT =======================
         async function handleLogout() {
@@ -502,6 +548,7 @@
             border-radius: 1.5rem;
             padding: 1.5rem;
             box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
         }
 
         h2 {
@@ -646,6 +693,60 @@
             border-left: 4px solid #1e6f3f;
         }
 
+        .project-name-input, .link-input {
+            width: 100%;
+            padding: 0.4rem;
+            border: 1px solid #cbd5e1;
+            border-radius: 1rem;
+            font-size: 0.9rem;
+        }
+
+        .add-product-card {
+            background: #f8fafc;
+            border-radius: 1rem;
+            padding: 1.2rem;
+            margin-top: 1.5rem;
+            border: 1px solid #e2e8f0;
+        }
+
+        .add-product-card h3 {
+            margin-bottom: 1rem;
+            color: #1f3b4c;
+        }
+
+        .add-product-form {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            align-items: flex-end;
+        }
+
+        .add-product-form .form-group {
+            flex: 1;
+            min-width: 150px;
+        }
+
+        .add-product-form label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 0.3rem;
+            font-size: 0.8rem;
+            color: #2c3e66;
+        }
+
+        .add-product-form input {
+            width: 100%;
+            padding: 0.6rem;
+            border: 1px solid #cbd5e1;
+            border-radius: 1rem;
+        }
+
+        .add-product-form button {
+            background: #27ae60;
+            margin-top: 0;
+            padding: 0.6rem 1.2rem;
+        }
+
         @media (max-width: 768px) {
             .menu-bar {
                 flex-direction: column;
@@ -674,6 +775,13 @@
             .action-buttons {
                 justify-content: flex-start;
             }
+            .add-product-form {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .add-product-form .form-group {
+                width: 100%;
+            }
         }
     </style>
 </head>
@@ -699,13 +807,32 @@
                 <h2>Manajemen Produk</h2>
                 <table>
                     <thead>
-                        <tr><th>Kode Produk</th><th>Link</th><th>Aksi</th></tr>
+                        <tr><th>Kode Produk</th><th>Nama Projek</th><th>Link</th><th>Aksi</th></tr>
                     </thead>
                     <tbody id="productTableBody"></tbody>
                 </table>
-                <p style="margin-top: 1rem; font-size: 0.8rem; color: #4a627a;">
-                    <i class="fas fa-info-circle"></i> Produk ditampilkan berdasarkan kode yang telah diinput di manajemen user.
-                </p>
+                
+                <div class="add-product-card">
+                    <h3>➕ Tambah Produk Baru</h3>
+                    <form id="addProductForm" class="add-product-form">
+                        <div class="form-group">
+                            <label>Kode Produk *</label>
+                            <input type="text" id="newProductCode" placeholder="Contoh: SMART001" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Nama Projek</label>
+                            <input type="text" id="newProductName" placeholder="Nama projek / produk">
+                        </div>
+                        <div class="form-group">
+                            <label>Link (URL)</label>
+                            <input type="url" id="newProductLink" placeholder="https://...">
+                        </div>
+                        <button type="submit">Buat Produk</button>
+                    </form>
+                    <p style="margin-top: 0.8rem; font-size: 0.75rem; color: #4a627a;">
+                        <i class="fas fa-info-circle"></i> Produk yang dibuat akan langsung muncul di daftar. Untuk menampilkannya ke user, tambahkan kode produk pada halaman Manajemen User.
+                    </p>
+                </div>
             </div>
         </div>
     </div>
