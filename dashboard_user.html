@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>User Dashboard | Proyek Saya</title>
+    <title>User Dashboard | Produk Saya</title>
     <!-- Firebase SDK v9 -->
     <script type="module">
         // ======================= KONFIGURASI FIREBASE =======================
@@ -32,9 +32,9 @@
         const loadingDiv = document.getElementById('loading');
         const contentDiv = document.getElementById('content');
         const userEmailSpan = document.getElementById('userEmail');
-        const projectsTableBody = document.getElementById('projectsTableBody');
-        const addProjectForm = document.getElementById('addProjectForm');
-        const newProjectCodeInput = document.getElementById('newProjectCode');
+        const productsTableBody = document.getElementById('productsTableBody');
+        const addProductForm = document.getElementById('addProductForm');
+        const newProductCodeInput = document.getElementById('newProductCode');
         const messageDiv = document.getElementById('message');
         const logoutBtn = document.getElementById('logoutBtn');
 
@@ -59,13 +59,13 @@
             });
         }
 
-        // Hapus proyek dari user (tanpa menghapus produk global)
-        async function removeProjectFromUser(userId, code) {
+        // Hapus produk dari user (tanpa menghapus produk global)
+        async function removeProductFromUser(userId, code) {
             const userRef = doc(db, "users", userId);
             const userSnap = await getDoc(userRef);
             if (!userSnap.exists()) return;
             
-            // Hapus dari array projects
+            // Hapus dari array projects (field projects menyimpan kode produk)
             await updateDoc(userRef, {
                 projects: arrayRemove(code)
             });
@@ -79,16 +79,14 @@
             }
         }
 
-        // Muat data user dan daftar proyek
+        // Muat data user dan daftar produk
         async function loadUserDashboard(user) {
             try {
-                // Ambil dokumen user
                 const userDocRef = doc(db, "users", user.uid);
                 let userSnap = await getDoc(userDocRef);
                 let userData = {};
 
                 if (!userSnap.exists()) {
-                    // Buat dokumen user baru dengan array projects kosong dan projectCustomNames kosong
                     userData = {
                         email: user.email,
                         projects: [],
@@ -100,18 +98,16 @@
                     userData = userSnap.data();
                 }
 
-                const projects = userData.projects || [];
+                const products = userData.projects || [];
                 const customNames = userData.projectCustomNames || {};
                 
                 userEmailSpan.textContent = user.email;
 
-                // Tampilkan daftar proyek dalam tabel
-                projectsTableBody.innerHTML = '';
-                if (projects.length === 0) {
-                    projectsTableBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Belum ada proyek. Tambahkan menggunakan form di bawah.</td></tr>';
+                productsTableBody.innerHTML = '';
+                if (products.length === 0) {
+                    productsTableBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Belum ada produk. Tambahkan menggunakan form di bawah.</td></tr>';
                 } else {
-                    for (const code of projects) {
-                        // Ambil data produk dari koleksi products (nama default dan link)
+                    for (const code of products) {
                         const productDocRef = doc(db, "products", code);
                         const productSnap = await getDoc(productDocRef);
                         let defaultName = code;
@@ -126,13 +122,12 @@
                         const hasLink = link && link.trim() !== '';
                         const displayName = customNames[code] ? customNames[code] : defaultName;
                         
-                        // Buat baris tabel dengan kolom Nama Projek (bisa diedit)
                         const row = document.createElement('tr');
                         row.setAttribute('data-code', code);
                         row.innerHTML = `
-                            <td data-label="Nama Projek" class="project-name-cell">
-                                <span class="project-name-text">${escapeHtml(displayName)}</span>
-                                <button class="edit-name-btn" data-code="${escapeHtml(code)}" title="Edit nama projek">✏️</button>
+                            <td data-label="Nama Produk" class="product-name-cell">
+                                <span class="product-name-text">${escapeHtml(displayName)}</span>
+                                <button class="edit-name-btn" data-code="${escapeHtml(code)}" title="Edit nama produk">✏️</button>
                                 <div class="edit-name-form hidden">
                                     <input type="text" class="edit-name-input" value="${escapeHtml(displayName)}">
                                     <div class="edit-buttons">
@@ -141,22 +136,22 @@
                                     </div>
                                 </div>
                             </td>
-                            <td data-label="Kode Proyek">${escapeHtml(code)}</td>
+                            <td data-label="Kode Produk">${escapeHtml(code)}</td>
                             <td data-label="Akses Dashboard">
-                                <button class="open-project-btn" data-link="${hasLink ? escapeHtml(link) : ''}" ${!hasLink ? 'disabled' : ''}>
+                                <button class="open-product-btn" data-link="${hasLink ? escapeHtml(link) : ''}" ${!hasLink ? 'disabled' : ''}>
                                     <i class="fas fa-tachometer-alt"></i> Dashboard
                                 </button>
                             </td>
                             <td data-label="Status">${hasLink ? '<span class="status-active">Aktif</span>' : '<span class="status-pending">Menunggu Link</span>'}</td>
                             <td data-label="Hapus">
-                                <button class="delete-project-btn" data-code="${escapeHtml(code)}" title="Hapus proyek">✖</button>
+                                <button class="delete-product-btn" data-code="${escapeHtml(code)}" title="Hapus produk">✖</button>
                             </td>
                         `;
-                        projectsTableBody.appendChild(row);
+                        productsTableBody.appendChild(row);
                     }
 
                     // Event listener untuk tombol buka dashboard
-                    document.querySelectorAll('.open-project-btn').forEach(btn => {
+                    document.querySelectorAll('.open-product-btn').forEach(btn => {
                         btn.addEventListener('click', () => {
                             const link = btn.getAttribute('data-link');
                             if (link) {
@@ -167,14 +162,14 @@
                         });
                     });
 
-                    // Event listener untuk tombol hapus proyek
-                    document.querySelectorAll('.delete-project-btn').forEach(btn => {
+                    // Event listener untuk tombol hapus produk
+                    document.querySelectorAll('.delete-product-btn').forEach(btn => {
                         btn.addEventListener('click', async (e) => {
                             const code = btn.getAttribute('data-code');
-                            if (confirm(`Hapus proyek "${code}" dari daftar Anda?`)) {
+                            if (confirm(`Hapus produk "${code}" dari daftar Anda?`)) {
                                 try {
-                                    await removeProjectFromUser(user.uid, code);
-                                    showMessage(`Proyek "${code}" berhasil dihapus.`, false);
+                                    await removeProductFromUser(user.uid, code);
+                                    showMessage(`Produk "${code}" berhasil dihapus.`, false);
                                     await loadUserDashboard(user);
                                 } catch (error) {
                                     showMessage(`Gagal menghapus: ${error.message}`, true);
@@ -187,8 +182,8 @@
                     document.querySelectorAll('.edit-name-btn').forEach(btn => {
                         btn.addEventListener('click', (e) => {
                             e.stopPropagation();
-                            const cell = btn.closest('.project-name-cell');
-                            const textSpan = cell.querySelector('.project-name-text');
+                            const cell = btn.closest('.product-name-cell');
+                            const textSpan = cell.querySelector('.product-name-text');
                             const editForm = cell.querySelector('.edit-name-form');
                             const editInput = editForm.querySelector('.edit-name-input');
                             
@@ -202,13 +197,13 @@
                     // Event listener untuk simpan perubahan nama
                     document.querySelectorAll('.save-name-btn').forEach(btn => {
                         btn.addEventListener('click', async (e) => {
-                            const cell = btn.closest('.project-name-cell');
+                            const cell = btn.closest('.product-name-cell');
                             const code = cell.closest('tr').getAttribute('data-code');
                             const editInput = cell.querySelector('.edit-name-input');
                             const newName = editInput.value.trim();
                             
                             if (!newName) {
-                                showMessage('Nama projek tidak boleh kosong', true);
+                                showMessage('Nama produk tidak boleh kosong', true);
                                 return;
                             }
                             
@@ -220,7 +215,7 @@
                                 updatedCustomNames[code] = newName;
                                 await updateDoc(userDocRef, { projectCustomNames: updatedCustomNames });
                                 
-                                const textSpan = cell.querySelector('.project-name-text');
+                                const textSpan = cell.querySelector('.product-name-text');
                                 textSpan.textContent = newName;
                                 textSpan.classList.remove('hidden');
                                 const editBtn = cell.querySelector('.edit-name-btn');
@@ -228,7 +223,7 @@
                                 const editForm = cell.querySelector('.edit-name-form');
                                 editForm.classList.add('hidden');
                                 
-                                showMessage(`Nama projek berhasil diubah menjadi "${newName}"`, false);
+                                showMessage(`Nama produk berhasil diubah menjadi "${newName}"`, false);
                             } catch (error) {
                                 showMessage(`Gagal mengubah nama: ${error.message}`, true);
                             }
@@ -238,8 +233,8 @@
                     // Event listener untuk batal edit
                     document.querySelectorAll('.cancel-name-btn').forEach(btn => {
                         btn.addEventListener('click', (e) => {
-                            const cell = btn.closest('.project-name-cell');
-                            const textSpan = cell.querySelector('.project-name-text');
+                            const cell = btn.closest('.product-name-cell');
+                            const textSpan = cell.querySelector('.product-name-text');
                             const editBtn = cell.querySelector('.edit-name-btn');
                             const editForm = cell.querySelector('.edit-name-form');
                             
@@ -255,40 +250,37 @@
             }
         }
 
-        // Tambah proyek baru
-        async function addProject(user, code) {
+        // Tambah produk baru
+        async function addProduct(user, code) {
             if (!code.trim()) {
-                showMessage('Kode proyek tidak boleh kosong', true);
+                showMessage('Kode produk tidak boleh kosong', true);
                 return;
             }
             code = code.trim();
             try {
-                // Validasi: cek apakah kode ada di koleksi products
                 const productDocRef = doc(db, "products", code);
                 const productSnap = await getDoc(productDocRef);
                 if (!productSnap.exists()) {
-                    showMessage(`Kode proyek "${code}" tidak ditemukan. Pastikan kode sudah didaftarkan oleh admin.`, true);
+                    showMessage(`Kode produk "${code}" tidak ditemukan. Pastikan kode sudah didaftarkan oleh admin.`, true);
                     return;
                 }
 
-                // Cek apakah user sudah memiliki kode tersebut
                 const userDocRef = doc(db, "users", user.uid);
                 const userSnap = await getDoc(userDocRef);
                 let userData = userSnap.exists() ? userSnap.data() : { projects: [] };
-                const projects = userData.projects || [];
-                if (projects.includes(code)) {
-                    showMessage(`Anda sudah memiliki proyek dengan kode "${code}".`, true);
+                const products = userData.projects || [];
+                if (products.includes(code)) {
+                    showMessage(`Anda sudah memiliki produk dengan kode "${code}".`, true);
                     return;
                 }
 
-                // Tambahkan ke array projects user
                 await updateDoc(userDocRef, {
                     projects: arrayUnion(code)
                 });
-                showMessage(`Proyek "${code}" berhasil ditambahkan!`, false);
+                showMessage(`Produk "${code}" berhasil ditambahkan!`, false);
                 await loadUserDashboard(user);
             } catch (error) {
-                showMessage(`Gagal menambahkan proyek: ${error.message}`, true);
+                showMessage(`Gagal menambahkan produk: ${error.message}`, true);
             }
         }
 
@@ -313,13 +305,13 @@
 
         // Event listeners
         logoutBtn.addEventListener('click', handleLogout);
-        addProjectForm.addEventListener('submit', async (e) => {
+        addProductForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const newCode = newProjectCodeInput.value;
+            const newCode = newProductCodeInput.value;
             const user = auth.currentUser;
             if (user) {
-                await addProject(user, newCode);
-                newProjectCodeInput.value = '';
+                await addProduct(user, newCode);
+                newProductCodeInput.value = '';
             } else {
                 showMessage('Anda belum login', true);
             }
@@ -335,12 +327,30 @@
         }
 
         body {
-            background: linear-gradient(145deg, #e0eaf4 0%, #cfdef3 100%);
+            background-image: url('background_link.png');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            background-repeat: no-repeat;
+            position: relative;
             min-height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
             padding: 1.5rem;
+        }
+
+        /* Overlay transparan agar teks terbaca */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.55);
+            backdrop-filter: blur(2px);
+            z-index: -1;
         }
 
         .dashboard-card {
@@ -438,14 +448,14 @@
             cursor: not-allowed;
         }
 
-        .open-project-btn {
+        .open-product-btn {
             background: #2c7da0;
             display: inline-flex;
             align-items: center;
             gap: 0.5rem;
         }
 
-        .delete-project-btn {
+        .delete-product-btn {
             background: #c0392b;
             padding: 0.3rem 0.8rem;
             font-size: 0.9rem;
@@ -519,13 +529,13 @@
             color: #4a627a;
         }
 
-        .project-name-cell {
+        .product-name-cell {
             display: flex;
             align-items: center;
             gap: 0.5rem;
             flex-wrap: wrap;
         }
-        .project-name-text {
+        .product-name-text {
             flex: 1;
             font-weight: 500;
         }
@@ -590,7 +600,7 @@
                 left: 0.75rem;
                 font-weight: bold;
             }
-            .project-name-cell {
+            .product-name-cell {
                 flex-direction: column;
                 align-items: flex-start;
             }
@@ -609,7 +619,7 @@
 <div id="content" style="display: none;">
     <div class="dashboard-card">
         <h1><i class="fas fa-chalkboard-user"></i> Dashboard User</h1>
-        <div class="sub">Proyek yang dipesan & akses dashboard</div>
+        <div class="sub">Produk yang dipesan & akses dashboard</div>
 
         <div class="info-card">
             <div class="info-row">
@@ -618,36 +628,36 @@
             </div>
         </div>
 
-        <h3><i class="fas fa-folder-open"></i> Daftar Proyek Saya</h3>
+        <h3><i class="fas fa-folder-open"></i> Daftar Produk Saya</h3>
         <table>
             <thead>
                 <tr>
-                    <th>Nama Projek</th>
-                    <th>Kode Proyek</th>
+                    <th>Nama Produk</th>
+                    <th>Kode Produk</th>
                     <th>Akses Dashboard</th>
                     <th>Status</th>
                     <th>Hapus</th>
                 </tr>
             </thead>
-            <tbody id="projectsTableBody">
+            <tbody id="productsTableBody">
                 <tr><td colspan="5">Memuat...</td></tr>
             </tbody>
         </table>
 
         <hr style="margin: 1.5rem 0; border-color: #dce5f0;">
 
-        <h3><i class="fas fa-plus-circle"></i> Tambah Proyek Baru</h3>
-        <form id="addProjectForm">
+        <h3><i class="fas fa-plus-circle"></i> Tambah Produk Baru</h3>
+        <form id="addProductForm">
             <div class="form-group">
-                <input type="text" id="newProjectCode" placeholder="Masukkan kode proyek yang ingin dipesan" required>
+                <input type="text" id="newProductCode" placeholder="Masukkan kode produk yang ingin dipesan" required>
             </div>
-            <button type="submit" style="width: 100%;">Tambah Proyek</button>
+            <button type="submit" style="width: 100%;">Tambah Produk</button>
         </form>
 
         <div id="message" class="message"></div>
         <button id="logoutBtn" class="logout-btn">Logout</button>
         <footer>
-            <i class="fas fa-info-circle"></i> Hanya kode proyek yang sudah didaftarkan admin yang dapat ditambahkan. Anda dapat mengedit nama projek atau menghapus proyek kapan saja.
+            <i class="fas fa-info-circle"></i> Hanya kode produk yang sudah didaftarkan admin yang dapat ditambahkan. Anda dapat mengedit nama produk atau menghapus produk kapan saja.
         </footer>
     </div>
 </div>
