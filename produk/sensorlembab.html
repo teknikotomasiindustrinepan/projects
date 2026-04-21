@@ -2,8 +2,8 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>Dashboard Soil Moisture Monitor</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Soil Moisture Monitor - Real-time</title>
     <style>
         * {
             margin: 0;
@@ -33,7 +33,6 @@
 
         .header {
             text-align: center;
-            margin-bottom: 20px;
         }
 
         .header h1 {
@@ -58,6 +57,7 @@
         .status-active {
             background: #10b981;
             color: white;
+            animation: pulse 2s infinite;
         }
 
         .status-inactive {
@@ -68,6 +68,12 @@
         .status-waiting {
             background: #f59e0b;
             color: white;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
         }
 
         .sensor-card {
@@ -96,7 +102,6 @@
 
         .progress-fill {
             height: 100%;
-            background: linear-gradient(90deg, #3b82f6, #06b6d4);
             transition: width 0.3s ease;
             display: flex;
             align-items: center;
@@ -143,33 +148,51 @@
             font-size: 12px;
         }
 
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
+        .hidden {
+            display: none;
         }
 
-        .loading {
-            animation: pulse 1.5s ease-in-out infinite;
+        .error-message {
+            background: #fee2e2;
+            color: #dc2626;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 15px;
+            font-size: 14px;
+        }
+
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 10px;
+            margin-top: 10px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        button:hover {
+            background: #2563eb;
         }
     </style>
-    
-    <!-- MQTT Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
 </head>
 <body>
     <div class="container">
         <div class="card header">
             <h1>💧 Soil Moisture Monitor</h1>
-            <p>Dashboard Real-time</p>
+            <p>Real-time Monitoring</p>
         </div>
 
         <div class="card status-card">
             <h3>📡 Status NodeMCU</h3>
             <div id="statusBadge" class="status-badge status-waiting">⏳ Menunggu koneksi...</div>
             <div id="wifiInfo" style="margin-top: 10px; font-size: 12px; color: #666;"></div>
+            <button onclick="forceReconnect()" style="margin-top: 10px;">🔄 Refresh Koneksi</button>
         </div>
 
-        <div id="dataCard" class="card sensor-card" style="display: none;">
+        <div id="dataCard" class="card sensor-card hidden">
             <h3>🌱 Kelembaban Tanah</h3>
             <div class="moisture-value" id="moistureValue">---</div>
             <div class="moisture-label">Nilai Sensor (0-1024)</div>
@@ -189,6 +212,12 @@
             </div>
         </div>
 
+        <div id="offlineMessage" class="card error-message hidden">
+            ⚠️ <strong>NodeMCU Offline</strong><br>
+            NodeMCU tidak terhubung ke WiFi atau sedang offline.<br>
+            Data tidak dapat ditampilkan.
+        </div>
+
         <div class="card info-card">
             <div id="lastUpdate" class="last-update">Terakhir update: ---</div>
             <div style="margin-top: 10px;">
@@ -202,41 +231,44 @@
         // Konfigurasi MQTT
         const broker = "wss://broker.hivemq.com:8000/mqtt";
         const topic = "iot/soil/moisture";
+        const statusTopic = "iot/soil/status";
         
         let client = null;
         let lastValue = null;
-        let lastUpdateTime = null;
-        let isConnected = false;
+        let isOnline = false;
         let reconnectAttempts = 0;
+        let lastDataTime = 0;
+        let connectionCheckInterval = null;
 
         // Elemen DOM
         const statusBadge = document.getElementById('statusBadge');
         const wifiInfo = document.getElementById('wifiInfo');
         const dataCard = document.getElementById('dataCard');
+        const offlineMessage = document.getElementById('offlineMessage');
         const moistureValue = document.getElementById('moistureValue');
         const progressFill = document.getElementById('progressFill');
         const relayStatus = document.getElementById('relayStatus');
         const lastUpdateElem = document.getElementById('lastUpdate');
 
-        // Threshold dari NodeMCU
         const THRESHOLD = 700;
 
-        // Fungsi untuk update tampilan berdasarkan nilai sensor
+        // Update tampilan dashboard
         function updateDashboard(value) {
             const numValue = parseInt(value);
             if (isNaN(numValue)) return;
             
             lastValue = numValue;
+            lastDataTime = Date.now();
             
             // Update nilai sensor
             moistureValue.innerHTML = numValue;
             
-            // Hitung persentase (0-1024 ke 0-100%)
+            // Hitung persentase
             const percentage = Math.min(100, Math.max(0, Math.round((numValue / 1024) * 100)));
             progressFill.style.width = percentage + '%';
             progressFill.innerHTML = percentage + '%';
             
-            // Update warna progress bar berdasarkan tingkat kekeringan
+            // Update warna dan status relay
             if (numValue >= THRESHOLD) {
                 progressFill.style.background = "linear-gradient(90deg, #f59e0b, #ef4444)";
                 relayStatus.innerHTML = '🔴 OFF (Tanah Kering)';
@@ -247,142 +279,182 @@
                 relayStatus.className = 'relay-on';
             }
             
-            // Update status tanah
-            const soilStatus = document.querySelector('.threshold-info');
-            if (numValue >= THRESHOLD) {
-                soilStatus.style.background = "#fee2e2";
-            } else {
-                soilStatus.style.background = "#d1fae5";
-            }
-            
             // Update waktu
             const now = new Date();
-            lastUpdateTime = now;
             lastUpdateElem.innerHTML = `Terakhir update: ${now.toLocaleTimeString('id-ID')}`;
         }
 
-        // Fungsi untuk update status koneksi NodeMCU
-        function updateNodeMCUStatus(connected) {
-            isConnected = connected;
+        // Update status online/offline
+        function updateOnlineStatus(online) {
+            isOnline = online;
             
-            if (connected) {
+            if (online && lastValue !== null) {
+                // Online dan ada data
                 statusBadge.className = 'status-badge status-active';
-                statusBadge.innerHTML = '✅ AKTIF - Tersambung';
-                wifiInfo.innerHTML = '📶 NodeMCU terhubung ke WiFi dan mengirim data';
-                dataCard.style.display = 'block';
+                statusBadge.innerHTML = '✅ AKTIF - Online';
+                wifiInfo.innerHTML = '📶 NodeMCU terhubung dan mengirim data';
+                dataCard.classList.remove('hidden');
+                offlineMessage.classList.add('hidden');
+            } else if (online && lastValue === null) {
+                // Online tapi belum ada data
+                statusBadge.className = 'status-badge status-waiting';
+                statusBadge.innerHTML = '⏳ Menunggu data...';
+                wifiInfo.innerHTML = 'MQTT terhubung, menunggu data dari NodeMCU...';
+                dataCard.classList.add('hidden');
+                offlineMessage.classList.add('hidden');
             } else {
+                // Offline
                 statusBadge.className = 'status-badge status-inactive';
-                statusBadge.innerHTML = '❌ TIDAK AKTIF - Tidak tersambung';
+                statusBadge.innerHTML = '❌ TIDAK AKTIF - Offline';
                 wifiInfo.innerHTML = '⚠️ NodeMCU tidak terhubung ke WiFi atau sedang offline';
-                dataCard.style.display = 'none';
+                dataCard.classList.add('hidden');
+                offlineMessage.classList.remove('hidden');
                 moistureValue.innerHTML = '---';
                 progressFill.style.width = '0%';
                 progressFill.innerHTML = '0%';
                 relayStatus.innerHTML = '---';
-                lastUpdateElem.innerHTML = 'Terakhir update: Menunggu koneksi...';
             }
         }
 
-        // Fungsi koneksi MQTT
-        function connectMQTT() {
-            console.log("Menghubungkan ke MQTT broker...");
+        // Cek koneksi dan data timeout
+        function checkConnection() {
+            const now = Date.now();
             
-            client = new Paho.MQTT.Client(broker, "webclient_" + Math.random().toString(36).substr(2, 9));
-            
-            client.onConnectionLost = onConnectionLost;
-            client.onMessageArrived = onMessageArrived;
-            
-            client.connect({
-                onSuccess: onConnect,
-                onFailure: onFailure,
-                timeout: 10,
-                useSSL: true
-            });
-        }
-        
-        function onConnect() {
-            console.log("MQTT Connected!");
-            reconnectAttempts = 0;
-            
-            // Subscribe ke topic
-            client.subscribe(topic);
-            console.log("Subscribed to: " + topic);
-            
-            // Reset status - masih menunggu data dari NodeMCU
-            statusBadge.className = 'status-badge status-waiting';
-            statusBadge.innerHTML = '⏳ Menunggu data...';
-            wifiInfo.innerHTML = 'MQTT terhubung, menunggu data dari NodeMCU...';
-            
-            // Set timeout untuk deteksi NodeMCU aktif (jika 30 detik tidak ada data, anggap tidak aktif)
-            if (window.dataTimeout) clearTimeout(window.dataTimeout);
-            window.dataTimeout = setTimeout(() => {
-                if (lastValue === null) {
-                    updateNodeMCUStatus(false);
+            // Jika sudah 15 detik tidak ada data, anggap offline
+            if (lastDataTime > 0 && (now - lastDataTime) > 15000) {
+                if (isOnline) {
+                    console.log("No data for 15 seconds, marking as offline");
+                    updateOnlineStatus(false);
                 }
-            }, 30000);
+            }
         }
-        
-        function onFailure(err) {
-            console.error("MQTT Connection Failed: ", err);
-            reconnectAttempts++;
-            updateNodeMCUStatus(false);
+
+        // MQTT Connection Lost
+        function onConnectionLost(response) {
+            console.log("Connection lost: " + (response.errorMessage || "Unknown error"));
+            updateOnlineStatus(false);
             
-            // Retry koneksi setelah 5 detik
+            // Reconnect setelah 5 detik
             setTimeout(() => {
-                if (reconnectAttempts < 10) {
+                if (client && !client.isConnected()) {
                     connectMQTT();
                 }
             }, 5000);
         }
-        
-        function onConnectionLost(response) {
-            console.log("Connection lost: " + response.errorMessage);
-            updateNodeMCUStatus(false);
-            
-            // Reconnect setelah 5 detik
-            setTimeout(() => {
-                connectMQTT();
-            }, 5000);
-        }
-        
+
+        // MQTT Message Arrived
         function onMessageArrived(message) {
-            console.log("Message received: " + message.payloadString);
+            console.log("Message received on " + message.destinationName + ": " + message.payloadString);
+            
             const payload = message.payloadString;
             
-            // Reset timeout data
-            if (window.dataTimeout) clearTimeout(window.dataTimeout);
-            
-            // NodeMCU aktif karena mengirim data
-            updateNodeMCUStatus(true);
+            // Reset status online
+            updateOnlineStatus(true);
             
             // Update dashboard dengan nilai sensor
             updateDashboard(payload);
-            
-            // Set timeout untuk deteksi kehilangan data (15 detik tanpa data = offline)
-            if (window.inactivityTimeout) clearTimeout(window.inactivityTimeout);
-            window.inactivityTimeout = setTimeout(() => {
-                console.log("No data received for 15 seconds, marking as inactive");
-                updateNodeMCUStatus(false);
-            }, 15000);
         }
-        
-        // Inisialisasi koneksi MQTT
+
+        // MQTT Connect Success
+        function onConnect() {
+            console.log("MQTT Connected successfully!");
+            reconnectAttempts = 0;
+            
+            // Subscribe ke topics
+            client.subscribe(topic);
+            client.subscribe(statusTopic);
+            console.log("Subscribed to: " + topic + " and " + statusTopic);
+            
+            // Reset status
+            updateOnlineStatus(false);
+            lastDataTime = 0;
+            lastValue = null;
+            
+            // Set timeout untuk deteksi data
+            setTimeout(() => {
+                if (lastDataTime === 0) {
+                    wifiInfo.innerHTML = 'Menunggu data dari NodeMCU... Pastikan NodeMCU terhubung ke WiFi';
+                }
+            }, 5000);
+        }
+
+        // MQTT Connect Failed
+        function onFailure(err) {
+            console.error("MQTT Connection Failed: ", err);
+            reconnectAttempts++;
+            updateOnlineStatus(false);
+            
+            // Retry dengan exponential backoff
+            const delay = Math.min(30000, 5000 * Math.pow(1.5, reconnectAttempts));
+            console.log(`Reconnecting in ${delay/1000} seconds...`);
+            
+            setTimeout(() => {
+                if (reconnectAttempts < 20) {
+                    connectMQTT();
+                } else {
+                    wifiInfo.innerHTML = 'Gagal terhubung ke MQTT broker. Periksa koneksi internet.';
+                }
+            }, delay);
+        }
+
+        // Connect to MQTT Broker
+        function connectMQTT() {
+            if (client && client.isConnected()) {
+                console.log("Already connected");
+                return;
+            }
+            
+            console.log("Connecting to MQTT broker...");
+            
+            // Buat client ID unik
+            const clientId = "web_dashboard_" + Math.random().toString(36).substr(2, 8);
+            
+            client = new Paho.MQTT.Client(broker, clientId);
+            
+            client.onConnectionLost = onConnectionLost;
+            client.onMessageArrived = onMessageArrived;
+            
+            const options = {
+                timeout: 10,
+                useSSL: true,
+                keepAliveInterval: 30,
+                cleanSession: true,
+                onSuccess: onConnect,
+                onFailure: onFailure
+            };
+            
+            client.connect(options);
+        }
+
+        // Force reconnect
+        function forceReconnect() {
+            console.log("Force reconnecting...");
+            if (client && client.isConnected()) {
+                client.disconnect();
+            }
+            reconnectAttempts = 0;
+            setTimeout(() => {
+                connectMQTT();
+            }, 1000);
+        }
+
+        // Start connection checker
+        function startConnectionChecker() {
+            setInterval(() => {
+                checkConnection();
+            }, 5000);
+        }
+
+        // Inisialisasi
         connectMQTT();
+        startConnectionChecker();
         
-        // Cleanup saat page ditutup
+        // Cleanup on page unload
         window.addEventListener('beforeunload', () => {
             if (client && client.isConnected()) {
                 client.disconnect();
             }
         });
-        
-        // Cek koneksi berkala
-        setInterval(() => {
-            if (client && !client.isConnected()) {
-                console.log("Reconnecting MQTT...");
-                connectMQTT();
-            }
-        }, 30000);
     </script>
 </body>
 </html>
