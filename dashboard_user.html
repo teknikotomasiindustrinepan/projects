@@ -251,7 +251,7 @@
             width: fit-content;
         }
 
-        /* Table Styles - Professional & Selaras */
+        /* Table Styles - FULLY ALIGNED */
         .table-wrapper {
             overflow-x: auto;
             border-radius: 0.75rem;
@@ -262,6 +262,7 @@
             width: 100%;
             border-collapse: collapse;
             font-size: 0.85rem;
+            table-layout: fixed;
         }
         th {
             text-align: left;
@@ -271,6 +272,12 @@
             font-weight: 600;
             border-bottom: 2px solid #e2e8f0;
         }
+        /* Fixed column widths */
+        th:nth-child(1), td:nth-child(1) { width: 40%; }
+        th:nth-child(2), td:nth-child(2) { width: 25%; }
+        th:nth-child(3), td:nth-child(3) { width: 20%; }
+        th:nth-child(4), td:nth-child(4) { width: 15%; }
+        
         td {
             padding: 1rem 1rem;
             border-bottom: 1px solid #e2e8f0;
@@ -284,8 +291,12 @@
             background: #f8fafc;
         }
 
-        /* Product Name Cell */
+        /* Product Name Cell - TIDAK pakai flex yang mengganggu */
         .product-name-cell {
+            display: block;
+            position: relative;
+        }
+        .product-name-wrapper {
             display: flex;
             align-items: center;
             gap: 0.6rem;
@@ -294,6 +305,7 @@
         .product-name-text {
             font-weight: 500;
             color: #1e293b;
+            display: inline-block;
         }
         .edit-name-btn {
             background: #fef3c7;
@@ -304,6 +316,9 @@
             color: #d97706;
             font-size: 0.7rem;
             transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.2rem;
         }
         .edit-name-btn:hover {
             background: #fde68a;
@@ -313,7 +328,7 @@
             gap: 0.4rem;
             flex-wrap: wrap;
             align-items: center;
-            width: 100%;
+            margin-top: 0.5rem;
         }
         .edit-name-input {
             flex: 2;
@@ -630,7 +645,7 @@
             background: #c0392b;
         }
 
-        /* Responsive */
+        /* Responsive - Mobile tetap rapi */
         @media (max-width: 768px) {
             body { padding: 1rem; }
             .card-header { padding: 1rem 1.2rem; }
@@ -639,7 +654,7 @@
             .access-card { flex-direction: column; text-align: center; }
             .access-info { justify-content: center; }
             
-            /* Table responsive */
+            /* Table responsive - tetap rapi */
             .table-wrapper {
                 border: none;
             }
@@ -662,6 +677,7 @@
                 padding: 0.75rem 1rem;
                 border-bottom: 1px solid #e2e8f0;
                 gap: 1rem;
+                width: 100% !important;
             }
             td:last-child {
                 border-bottom: none;
@@ -672,8 +688,7 @@
                 color: #1f3b4c;
                 min-width: 100px;
             }
-            .product-name-cell {
-                flex: 1;
+            .product-name-wrapper {
                 justify-content: flex-end;
             }
             .dashboard-tab { font-size: 0.7rem; padding: 0.4rem 0.8rem; }
@@ -853,20 +868,22 @@
                         row.setAttribute('data-code', product.code);
                         row.innerHTML = `
                             <td data-label="Nama Produk" class="product-name-cell">
-                                <span class="product-name-text">${escapeHtml(product.displayName)}</span>
-                                <button class="edit-name-btn" data-code="${escapeHtml(product.code)}" title="Edit nama produk">✏️</button>
-                                <div class="edit-name-form hidden">
-                                    <input type="text" class="edit-name-input" value="${escapeHtml(product.displayName)}">
-                                    <div class="edit-buttons">
-                                        <button class="save-name-btn">Simpan</button>
-                                        <button class="cancel-name-btn">Batal</button>
+                                <div class="product-name-wrapper">
+                                    <span class="product-name-text">${escapeHtml(product.displayName)}</span>
+                                    <button class="edit-name-btn" data-code="${escapeHtml(product.code)}" title="Edit nama produk"><i class="fas fa-pencil-alt"></i> Edit</button>
+                                    <div class="edit-name-form hidden">
+                                        <input type="text" class="edit-name-input" value="${escapeHtml(product.displayName)}">
+                                        <div class="edit-buttons">
+                                            <button class="save-name-btn"><i class="fas fa-check"></i> Simpan</button>
+                                            <button class="cancel-name-btn"><i class="fas fa-times"></i> Batal</button>
+                                        </div>
                                     </div>
                                 </div>
-                             </td>
-                            <td data-label="Kode Produk">${escapeHtml(product.code)}</td>
+                              </td>
+                            <td data-label="Kode Produk"><code style="background:#f1f5f9; padding:0.2rem 0.5rem; border-radius:0.5rem;">${escapeHtml(product.code)}</code></td>
                             <td data-label="Status">${product.hasLink ? '<span class="status-active"><i class="fas fa-link"></i> Dashboard Tersedia</span>' : '<span class="status-pending"><i class="fas fa-clock"></i> Menunggu Link</span>'}</td>
                             <td data-label="Hapus">
-                                <button class="delete-product-btn" data-code="${escapeHtml(product.code)}" title="Hapus produk">✖ Hapus</button>
+                                <button class="delete-product-btn" data-code="${escapeHtml(product.code)}" title="Hapus produk"><i class="fas fa-trash-alt"></i> Hapus</button>
                             </td>
                         `;
                         productsTableBody.appendChild(row);
@@ -895,9 +912,9 @@
                     document.querySelectorAll('.edit-name-btn').forEach(btn => {
                         btn.addEventListener('click', (e) => {
                             e.stopPropagation();
-                            const cell = btn.closest('.product-name-cell');
-                            const textSpan = cell.querySelector('.product-name-text');
-                            const editForm = cell.querySelector('.edit-name-form');
+                            const wrapper = btn.closest('.product-name-wrapper');
+                            const textSpan = wrapper.querySelector('.product-name-text');
+                            const editForm = wrapper.querySelector('.edit-name-form');
                             const editInput = editForm.querySelector('.edit-name-input');
                             
                             textSpan.classList.add('hidden');
@@ -910,9 +927,9 @@
                     // Event listener untuk simpan perubahan nama
                     document.querySelectorAll('.save-name-btn').forEach(btn => {
                         btn.addEventListener('click', async (e) => {
-                            const cell = btn.closest('.product-name-cell');
-                            const code = cell.closest('tr').getAttribute('data-code');
-                            const editInput = cell.querySelector('.edit-name-input');
+                            const wrapper = btn.closest('.product-name-wrapper');
+                            const code = wrapper.closest('tr').getAttribute('data-code');
+                            const editInput = wrapper.querySelector('.edit-name-input');
                             const newName = editInput.value.trim();
                             
                             if (!newName) {
@@ -928,12 +945,12 @@
                                 updatedCustomNames[code] = newName;
                                 await updateDoc(userDocRef, { projectCustomNames: updatedCustomNames });
                                 
-                                const textSpan = cell.querySelector('.product-name-text');
+                                const textSpan = wrapper.querySelector('.product-name-text');
                                 textSpan.textContent = newName;
                                 textSpan.classList.remove('hidden');
-                                const editBtn = cell.querySelector('.edit-name-btn');
+                                const editBtn = wrapper.querySelector('.edit-name-btn');
                                 editBtn.classList.remove('hidden');
-                                const editForm = cell.querySelector('.edit-name-form');
+                                const editForm = wrapper.querySelector('.edit-name-form');
                                 editForm.classList.add('hidden');
                                 
                                 showMessage(`Nama produk berhasil diubah menjadi "${newName}"`, false);
@@ -947,10 +964,10 @@
                     // Event listener untuk batal edit
                     document.querySelectorAll('.cancel-name-btn').forEach(btn => {
                         btn.addEventListener('click', (e) => {
-                            const cell = btn.closest('.product-name-cell');
-                            const textSpan = cell.querySelector('.product-name-text');
-                            const editBtn = cell.querySelector('.edit-name-btn');
-                            const editForm = cell.querySelector('.edit-name-form');
+                            const wrapper = btn.closest('.product-name-wrapper');
+                            const textSpan = wrapper.querySelector('.product-name-text');
+                            const editBtn = wrapper.querySelector('.edit-name-btn');
+                            const editForm = wrapper.querySelector('.edit-name-form');
                             
                             textSpan.classList.remove('hidden');
                             editBtn.classList.remove('hidden');
@@ -1228,14 +1245,14 @@
                         <table>
                             <thead>
                                 <tr>
-                                    <th style="width: 40%">Nama Produk</th>
-                                    <th style="width: 25%">Kode Produk</th>
-                                    <th style="width: 20%">Status</th>
-                                    <th style="width: 15%">Hapus</th>
+                                    <th>Nama Produk</th>
+                                    <th>Kode Produk</th>
+                                    <th>Status</th>
+                                    <th>Hapus</th>
                                 </tr>
                             </thead>
                             <tbody id="productsTableBody">
-                                <tr><td colspan="4" style="text-align: center; padding: 2rem;">Memuat...</td></tr>
+                                <tr><td colspan="4" style="text-align: center; padding: 2rem;">Memuat...</td</tr>
                             </tbody>
                         </table>
                     </div>
