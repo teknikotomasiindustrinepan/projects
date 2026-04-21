@@ -2,706 +2,9 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>User Dashboard | Produk Saya</title>
     <!-- Firebase SDK v9 -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
-            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
-            min-height: 100vh;
-            position: relative;
-            overflow-x: hidden;
-        }
-
-        /* Animated Background */
-        body::before {
-            content: '';
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: 
-                radial-gradient(circle at 20% 80%, rgba(56, 189, 248, 0.08) 0%, transparent 50%),
-                radial-gradient(circle at 80% 20%, rgba(139, 92, 246, 0.08) 0%, transparent 50%);
-            pointer-events: none;
-            z-index: 0;
-        }
-
-        /* Floating Orbs */
-        .orb {
-            position: fixed;
-            border-radius: 50%;
-            filter: blur(60px);
-            pointer-events: none;
-            z-index: 0;
-        }
-        .orb-1 {
-            top: -10%;
-            right: -10%;
-            width: 400px;
-            height: 400px;
-            background: rgba(56, 189, 248, 0.15);
-            animation: float 20s ease-in-out infinite;
-        }
-        .orb-2 {
-            bottom: -10%;
-            left: -10%;
-            width: 500px;
-            height: 500px;
-            background: rgba(139, 92, 246, 0.12);
-            animation: float 25s ease-in-out infinite reverse;
-        }
-        @keyframes float {
-            0%, 100% { transform: translate(0, 0) scale(1); }
-            50% { transform: translate(30px, -20px) scale(1.1); }
-        }
-
-        /* Container */
-        .container {
-            position: relative;
-            z-index: 1;
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 1.5rem;
-        }
-
-        /* Loading Screen */
-        .loading-screen {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(135deg, #0f172a, #1e293b);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-            transition: opacity 0.5s ease;
-        }
-        .loading-content {
-            text-align: center;
-        }
-        .loading-spinner {
-            width: 60px;
-            height: 60px;
-            border: 3px solid rgba(56, 189, 248, 0.2);
-            border-top-color: #38bdf8;
-            border-right-color: #a78bfa;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 1rem;
-        }
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-        .loading-text {
-            color: #94a3b8;
-            font-size: 0.9rem;
-            letter-spacing: 1px;
-        }
-
-        /* Dashboard Card */
-        .dashboard-card {
-            background: rgba(15, 23, 42, 0.7);
-            backdrop-filter: blur(20px);
-            border-radius: 2rem;
-            border: 1px solid rgba(56, 189, 248, 0.15);
-            box-shadow: 0 25px 45px -12px rgba(0, 0, 0, 0.5);
-            overflow: hidden;
-            transition: all 0.3s ease;
-        }
-
-        /* Header */
-        .card-header {
-            padding: 1.8rem 2rem;
-            border-bottom: 1px solid rgba(56, 189, 248, 0.1);
-            background: linear-gradient(135deg, rgba(56, 189, 248, 0.05), rgba(139, 92, 246, 0.05));
-        }
-        .card-header h1 {
-            font-size: 1.8rem;
-            font-weight: 700;
-            background: linear-gradient(135deg, #f1f5f9, #94a3b8);
-            background-clip: text;
-            -webkit-background-clip: text;
-            color: transparent;
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
-        .card-header h1 i {
-            background: linear-gradient(135deg, #38bdf8, #a78bfa);
-            background-clip: text;
-            -webkit-background-clip: text;
-            color: transparent;
-        }
-        .sub {
-            color: #64748b;
-            margin-top: 0.5rem;
-            font-size: 0.85rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        /* Content */
-        .card-content {
-            padding: 1.8rem 2rem;
-        }
-
-        /* Info Card */
-        .info-card {
-            background: rgba(30, 41, 59, 0.6);
-            border-radius: 1.2rem;
-            padding: 1rem 1.2rem;
-            margin-bottom: 1.5rem;
-            border: 1px solid rgba(56, 189, 248, 0.1);
-        }
-        .info-label {
-            color: #64748b;
-            font-size: 0.75rem;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-        .info-value {
-            color: #e2e8f0;
-            font-weight: 500;
-            font-size: 0.95rem;
-            word-break: break-all;
-        }
-
-        /* Dashboard Access Card */
-        .access-card {
-            background: linear-gradient(135deg, rgba(56, 189, 248, 0.1), rgba(139, 92, 246, 0.1));
-            border-radius: 1.2rem;
-            padding: 1.2rem 1.5rem;
-            margin-bottom: 2rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 1rem;
-            border: 1px solid rgba(56, 189, 248, 0.2);
-        }
-        .access-info {
-            display: flex;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 1rem;
-        }
-        .access-title {
-            display: flex;
-            align-items: center;
-            gap: 0.6rem;
-            color: #e2e8f0;
-            font-weight: 600;
-        }
-        .access-title i {
-            color: #38bdf8;
-            font-size: 1.2rem;
-        }
-        .badge {
-            background: rgba(56, 189, 248, 0.15);
-            border-radius: 2rem;
-            padding: 0.3rem 1rem;
-            font-size: 0.8rem;
-            font-weight: 600;
-            color: #38bdf8;
-        }
-        .status-text {
-            font-size: 0.8rem;
-            color: #94a3b8;
-            display: flex;
-            align-items: center;
-            gap: 0.4rem;
-        }
-        .btn-primary {
-            background: linear-gradient(135deg, #38bdf8, #818cf8);
-            border: none;
-            padding: 0.7rem 1.5rem;
-            border-radius: 2rem;
-            font-weight: 600;
-            font-size: 0.9rem;
-            color: white;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.6rem;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(56, 189, 248, 0.2);
-        }
-        .btn-primary:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(56, 189, 248, 0.3);
-        }
-        .btn-primary:disabled {
-            background: linear-gradient(135deg, #475569, #475569);
-            cursor: not-allowed;
-            opacity: 0.6;
-            box-shadow: none;
-        }
-
-        /* Section Title */
-        .section-title {
-            display: flex;
-            align-items: center;
-            gap: 0.6rem;
-            margin-bottom: 1.2rem;
-            color: #e2e8f0;
-            font-size: 1.1rem;
-            font-weight: 600;
-        }
-        .section-title i {
-            color: #38bdf8;
-        }
-        .info-note {
-            font-size: 0.75rem;
-            color: #64748b;
-            margin-bottom: 1rem;
-            display: flex;
-            align-items: center;
-            gap: 0.4rem;
-        }
-
-        /* Table Styles */
-        .table-wrapper {
-            overflow-x: auto;
-            border-radius: 1rem;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        th {
-            text-align: left;
-            padding: 0.9rem 1rem;
-            background: rgba(30, 41, 59, 0.5);
-            color: #94a3b8;
-            font-weight: 600;
-            font-size: 0.8rem;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        td {
-            padding: 1rem;
-            border-bottom: 1px solid rgba(56, 189, 248, 0.08);
-            color: #cbd5e1;
-            font-size: 0.9rem;
-        }
-        tr:hover td {
-            background: rgba(56, 189, 248, 0.05);
-        }
-
-        /* Product Name Cell */
-        .product-name-cell {
-            display: flex;
-            align-items: center;
-            gap: 0.6rem;
-            flex-wrap: wrap;
-        }
-        .product-name-text {
-            font-weight: 500;
-            color: #f1f5f9;
-        }
-        .edit-name-btn {
-            background: rgba(245, 158, 11, 0.2);
-            border: 1px solid rgba(245, 158, 11, 0.3);
-            padding: 0.2rem 0.6rem;
-            border-radius: 1.5rem;
-            cursor: pointer;
-            color: #fbbf24;
-            font-size: 0.7rem;
-            transition: all 0.2s;
-        }
-        .edit-name-btn:hover {
-            background: rgba(245, 158, 11, 0.4);
-            transform: scale(0.95);
-        }
-        .edit-name-form {
-            display: flex;
-            gap: 0.5rem;
-            flex-wrap: wrap;
-            align-items: center;
-            width: 100%;
-        }
-        .edit-name-input {
-            flex: 2;
-            min-width: 140px;
-            padding: 0.5rem 1rem;
-            border-radius: 2rem;
-            border: 1px solid #334155;
-            background: #1e293b;
-            color: #f1f5f9;
-            font-size: 0.85rem;
-        }
-        .edit-name-input:focus {
-            outline: none;
-            border-color: #38bdf8;
-        }
-        .edit-buttons {
-            display: flex;
-            gap: 0.3rem;
-        }
-        .save-name-btn {
-            background: #10b981;
-            border: none;
-            padding: 0.3rem 0.8rem;
-            border-radius: 1.5rem;
-            cursor: pointer;
-            color: white;
-            font-size: 0.7rem;
-        }
-        .cancel-name-btn {
-            background: #64748b;
-            border: none;
-            padding: 0.3rem 0.8rem;
-            border-radius: 1.5rem;
-            cursor: pointer;
-            color: white;
-            font-size: 0.7rem;
-        }
-
-        /* Status Badges */
-        .status-active {
-            color: #10b981;
-            font-weight: 500;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.4rem;
-            background: rgba(16, 185, 129, 0.1);
-            padding: 0.2rem 0.7rem;
-            border-radius: 2rem;
-            font-size: 0.75rem;
-        }
-        .status-pending {
-            color: #f59e0b;
-            font-weight: 500;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.4rem;
-            background: rgba(245, 158, 11, 0.1);
-            padding: 0.2rem 0.7rem;
-            border-radius: 2rem;
-            font-size: 0.75rem;
-        }
-
-        /* Delete Button */
-        .delete-product-btn {
-            background: rgba(239, 68, 68, 0.15);
-            border: 1px solid rgba(239, 68, 68, 0.3);
-            padding: 0.3rem 0.8rem;
-            border-radius: 1.5rem;
-            cursor: pointer;
-            color: #f87171;
-            font-weight: 500;
-            font-size: 0.75rem;
-            transition: all 0.2s;
-        }
-        .delete-product-btn:hover {
-            background: rgba(239, 68, 68, 0.3);
-            transform: scale(0.95);
-        }
-
-        /* Form Styles */
-        .form-group {
-            margin-bottom: 1rem;
-        }
-        .form-group input {
-            width: 100%;
-            padding: 0.9rem 1.2rem;
-            border-radius: 1.5rem;
-            border: 1px solid #334155;
-            background: #1e293b;
-            color: #f1f5f9;
-            font-size: 0.9rem;
-            transition: all 0.2s;
-        }
-        .form-group input:focus {
-            outline: none;
-            border-color: #38bdf8;
-            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.1);
-        }
-        .form-group input::placeholder {
-            color: #475569;
-        }
-        .btn-submit {
-            width: 100%;
-            background: linear-gradient(135deg, #38bdf8, #818cf8);
-            border: none;
-            padding: 0.9rem;
-            border-radius: 1.5rem;
-            font-weight: 600;
-            font-size: 0.95rem;
-            color: white;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        .btn-submit:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 15px rgba(56, 189, 248, 0.3);
-        }
-        .btn-logout {
-            width: 100%;
-            background: rgba(239, 68, 68, 0.15);
-            border: 1px solid rgba(239, 68, 68, 0.3);
-            padding: 0.9rem;
-            border-radius: 1.5rem;
-            font-weight: 600;
-            font-size: 0.9rem;
-            color: #f87171;
-            cursor: pointer;
-            transition: all 0.2s;
-            margin-top: 1rem;
-        }
-        .btn-logout:hover {
-            background: rgba(239, 68, 68, 0.25);
-        }
-
-        /* Message Toast */
-        .message {
-            position: fixed;
-            bottom: 2rem;
-            left: 50%;
-            transform: translateX(-50%);
-            padding: 0.8rem 1.5rem;
-            border-radius: 2rem;
-            font-size: 0.85rem;
-            z-index: 1000;
-            backdrop-filter: blur(10px);
-            animation: slideUp 0.3s ease;
-        }
-        @keyframes slideUp {
-            from {
-                opacity: 0;
-                transform: translateX(-50%) translateY(20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateX(-50%) translateY(0);
-            }
-        }
-        .message.error {
-            background: rgba(239, 68, 68, 0.9);
-            color: white;
-            border-left: 3px solid #ef4444;
-        }
-        .message.success {
-            background: rgba(16, 185, 129, 0.9);
-            color: white;
-            border-left: 3px solid #10b981;
-        }
-
-        /* Footer */
-        .footer {
-            text-align: center;
-            margin-top: 1.5rem;
-            padding-top: 1rem;
-            border-top: 1px solid rgba(56, 189, 248, 0.08);
-            font-size: 0.7rem;
-            color: #475569;
-        }
-
-        /* Hidden Class */
-        .hidden {
-            display: none;
-        }
-
-        /* Modal Styles - Professional */
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.85);
-            backdrop-filter: blur(12px);
-            z-index: 2000;
-            justify-content: center;
-            align-items: center;
-        }
-        .modal-content {
-            background: #0f172a;
-            border-radius: 1.5rem;
-            width: 95%;
-            max-width: 1400px;
-            height: 88vh;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            border: 1px solid rgba(56, 189, 248, 0.2);
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-        }
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 1rem 1.5rem;
-            background: linear-gradient(135deg, #1e293b, #0f172a);
-            border-bottom: 1px solid rgba(56, 189, 248, 0.15);
-        }
-        .modal-header h2 {
-            font-size: 1.2rem;
-            color: #e2e8f0;
-            display: flex;
-            align-items: center;
-            gap: 0.6rem;
-        }
-        .modal-header h2 i {
-            color: #38bdf8;
-        }
-        .close-modal {
-            font-size: 1.8rem;
-            cursor: pointer;
-            color: #64748b;
-            transition: all 0.2s;
-            line-height: 1;
-        }
-        .close-modal:hover {
-            color: #ef4444;
-            transform: scale(1.1);
-        }
-        .modal-body {
-            flex: 1;
-            overflow: auto;
-            padding: 1rem;
-            background: #0f172a;
-        }
-        .dashboard-tabs {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.5rem;
-            margin-bottom: 1rem;
-            padding-bottom: 0.5rem;
-            border-bottom: 1px solid #334155;
-            position: sticky;
-            top: 0;
-            background: #0f172a;
-            z-index: 10;
-        }
-        .dashboard-tab {
-            background: #1e293b;
-            color: #94a3b8;
-            border: 1px solid #334155;
-            padding: 0.5rem 1.2rem;
-            border-radius: 2rem;
-            cursor: pointer;
-            transition: all 0.2s;
-            font-size: 0.8rem;
-            font-weight: 500;
-        }
-        .dashboard-tab:hover {
-            background: #334155;
-            color: #e2e8f0;
-        }
-        .dashboard-tab.active {
-            background: linear-gradient(135deg, #38bdf8, #818cf8);
-            border-color: transparent;
-            color: white;
-        }
-        .dashboard-tabs-content {
-            position: relative;
-        }
-        .dashboard-iframe-container {
-            position: relative;
-            width: 100%;
-            height: calc(88vh - 120px);
-            background: #0f172a;
-            border-radius: 1rem;
-            overflow: hidden;
-        }
-        .dashboard-iframe-container.single {
-            height: calc(88vh - 100px);
-        }
-        .dashboard-iframe {
-            width: 100%;
-            height: 100%;
-            border: none;
-            background: white;
-            border-radius: 0.5rem;
-        }
-        .iframe-loading {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(15, 23, 42, 0.95);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            gap: 1rem;
-            color: #38bdf8;
-            font-size: 0.9rem;
-            z-index: 5;
-        }
-        .iframe-loading i {
-            font-size: 2rem;
-        }
-        .modal-footer {
-            padding: 0.8rem 1.5rem;
-            background: #1e293b;
-            border-top: 1px solid #334155;
-            display: flex;
-            justify-content: flex-end;
-        }
-        .btn-close-modal {
-            background: linear-gradient(135deg, #ef4444, #dc2626);
-            border: none;
-            padding: 0.5rem 1.5rem;
-            border-radius: 2rem;
-            cursor: pointer;
-            font-weight: 600;
-            color: white;
-            transition: all 0.2s;
-        }
-        .btn-close-modal:hover {
-            transform: scale(0.98);
-            opacity: 0.9;
-        }
-
-        /* Responsive */
-        @media (max-width: 768px) {
-            .container { padding: 1rem; }
-            .card-header { padding: 1.2rem 1.2rem; }
-            .card-header h1 { font-size: 1.4rem; }
-            .card-content { padding: 1.2rem; }
-            .access-card { flex-direction: column; text-align: center; }
-            .access-info { justify-content: center; }
-            th, td { display: block; }
-            th { display: none; }
-            td {
-                border-bottom: none;
-                position: relative;
-                padding-left: 40%;
-            }
-            td:before {
-                content: attr(data-label);
-                position: absolute;
-                left: 1rem;
-                font-weight: 600;
-                color: #64748b;
-            }
-            .product-name-cell { flex-direction: column; align-items: flex-start; }
-            .dashboard-tab { font-size: 0.7rem; padding: 0.4rem 0.8rem; }
-            .modal-content { width: 98%; height: 94vh; }
-            .dashboard-iframe-container { height: calc(94vh - 120px); }
-        }
-    </style>
     <script type="module">
         // ======================= KONFIGURASI FIREBASE =======================
         const firebaseConfig = {
@@ -838,7 +141,7 @@
                 
                 productsTableBody.innerHTML = '';
                 if (products.length === 0) {
-                    productsTableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 2rem;">Belum ada produk. Tambahkan menggunakan form di bawah.</td></tr>';
+                    productsTableBody.innerHTML = '<tr><td colspan="4" style="text-align: center;">Belum ada produk. Tambahkan menggunakan form di bawah.</td></tr>';
                     updateDashboardButton();
                 } else {
                     // Kumpulkan semua data produk terlebih dahulu
@@ -1187,125 +490,629 @@
             }
         });
     </script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+        }
+
+        body {
+            background-image: url('background_link.png');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            background-repeat: no-repeat;
+            position: relative;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 1.5rem;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.55);
+            backdrop-filter: blur(2px);
+            z-index: -1;
+        }
+
+        .dashboard-card {
+            background: rgba(255, 255, 255, 0.96);
+            border-radius: 2rem;
+            box-shadow: 0 20px 35px -12px rgba(0, 0, 0, 0.2);
+            width: 100%;
+            max-width: 1100px;
+            padding: 2rem;
+            backdrop-filter: blur(4px);
+        }
+
+        h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #1A2A4F, #2C3E66);
+            background-clip: text;
+            -webkit-background-clip: text;
+            color: transparent;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .sub {
+            color: #2c3e66cc;
+            margin-bottom: 1.8rem;
+            border-left: 3px solid #2c7da0;
+            padding-left: 1rem;
+        }
+
+        .info-card {
+            background: #eef2fc;
+            border-radius: 1.5rem;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.8rem;
+            flex-wrap: wrap;
+        }
+
+        .info-label {
+            font-weight: 600;
+            color: #1f3b4c;
+        }
+
+        .info-value {
+            color: #2c7da0;
+            font-weight: 500;
+            word-break: break-all;
+        }
+
+        /* Dashboard Access Card - Tombol Utama */
+        .dashboard-access-card {
+            background: linear-gradient(135deg, #1A2A4F, #2C3E66);
+            border-radius: 1.5rem;
+            padding: 1.2rem 1.5rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+            color: white;
+        }
+
+        .dashboard-access-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .dashboard-access-info h3 {
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .dashboard-badge {
+            background: rgba(255,255,255,0.2);
+            border-radius: 2rem;
+            padding: 0.3rem 1rem;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .dashboard-status {
+            font-size: 0.85rem;
+            opacity: 0.9;
+        }
+
+        .btn-open-all {
+            background: #27ae60;
+            color: white;
+            border: none;
+            padding: 0.8rem 1.8rem;
+            border-radius: 2rem;
+            font-weight: 700;
+            font-size: 1rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.8rem;
+            transition: 0.2s;
+        }
+
+        .btn-open-all:hover:not(:disabled) {
+            background: #1e8e4a;
+            transform: scale(0.98);
+        }
+
+        .btn-open-all:disabled {
+            background: #7f8c8d;
+            cursor: not-allowed;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        th, td {
+            text-align: left;
+            padding: 0.75rem;
+            border-bottom: 1px solid #e2e8f0;
+            vertical-align: middle;
+        }
+
+        th {
+            background: #eef2fc;
+            color: #1f3b4c;
+        }
+
+        button {
+            transition: 0.2s;
+        }
+
+        .delete-product-btn {
+            background: #c0392b;
+            padding: 0.3rem 0.8rem;
+            border-radius: 1.5rem;
+            border: none;
+            cursor: pointer;
+            color: white;
+            font-weight: 600;
+            font-size: 0.8rem;
+        }
+
+        .delete-product-btn:hover {
+            background: #a82315;
+            transform: scale(0.96);
+        }
+
+        .status-active {
+            color: #27ae60;
+            font-weight: 600;
+        }
+
+        .status-pending {
+            color: #e67e22;
+            font-weight: 600;
+        }
+
+        .form-group {
+            margin: 1.2rem 0;
+        }
+
+        input {
+            width: 100%;
+            padding: 0.8rem 1rem;
+            border: 1px solid #cbd5e1;
+            border-radius: 2rem;
+            font-size: 1rem;
+            background: white;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #2c7da0;
+            box-shadow: 0 0 0 3px rgba(44,125,160,0.2);
+        }
+
+        .message {
+            margin-top: 1rem;
+            padding: 0.7rem;
+            border-radius: 1rem;
+            text-align: center;
+            font-size: 0.85rem;
+        }
+
+        .error {
+            background: #ffe6e6;
+            color: #c0392b;
+            border-left: 4px solid #c0392b;
+        }
+
+        .success {
+            background: #e0f2e9;
+            color: #1e6f3f;
+            border-left: 4px solid #1e6f3f;
+        }
+
+        .logout-btn {
+            background: #c0392b;
+            margin-top: 1rem;
+            width: 100%;
+            padding: 0.8rem;
+            border-radius: 2rem;
+            border: none;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        #loading {
+            text-align: center;
+            font-size: 1.2rem;
+            color: #2c3e66;
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 2rem;
+            font-size: 0.7rem;
+            color: #4a627a;
+        }
+
+        .product-name-cell {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+        .product-name-text {
+            flex: 1;
+            font-weight: 500;
+        }
+        .edit-name-btn {
+            background: #f39c12;
+            padding: 0.2rem 0.6rem;
+            border-radius: 1.5rem;
+            border: none;
+            cursor: pointer;
+            color: white;
+            font-size: 0.8rem;
+        }
+        .edit-name-form {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            align-items: center;
+            width: 100%;
+        }
+        .edit-name-input {
+            flex: 2;
+            min-width: 120px;
+            padding: 0.4rem 0.8rem;
+            border-radius: 2rem;
+            border: 1px solid #cbd5e1;
+        }
+        .edit-buttons {
+            display: flex;
+            gap: 0.3rem;
+        }
+        .edit-buttons button {
+            padding: 0.3rem 0.8rem;
+            font-size: 0.8rem;
+            border-radius: 1.5rem;
+            border: none;
+            cursor: pointer;
+            color: white;
+        }
+        .save-name-btn {
+            background: #27ae60;
+        }
+        .cancel-name-btn {
+            background: #7f8c8d;
+        }
+        .hidden {
+            display: none;
+        }
+        
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(8px);
+        }
+        
+        .modal-content {
+            background: #1a2a4f;
+            border-radius: 1.5rem;
+            width: 95%;
+            max-width: 1400px;
+            height: 90vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 1.5rem;
+            background: linear-gradient(135deg, #1A2A4F, #2C3E66);
+            color: white;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+        }
+        
+        .modal-header h2 {
+            font-size: 1.3rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .close-modal {
+            font-size: 2rem;
+            cursor: pointer;
+            transition: 0.2s;
+            line-height: 1;
+        }
+        
+        .close-modal:hover {
+            color: #e74c3c;
+            transform: scale(1.1);
+        }
+        
+        .modal-body {
+            flex: 1;
+            overflow: auto;
+            padding: 1rem;
+            background: #f0f4f8;
+        }
+        
+        .dashboard-tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid #cbd5e1;
+            background: #f0f4f8;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        
+        .dashboard-tab {
+            background: #e2e8f0;
+            color: #1f3b4c;
+            border: none;
+            padding: 0.6rem 1.2rem;
+            border-radius: 2rem;
+            cursor: pointer;
+            transition: 0.2s;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        
+        .dashboard-tab:hover {
+            background: #cbd5e1;
+            transform: none;
+        }
+        
+        .dashboard-tab.active {
+            background: #2c7da0;
+            color: white;
+        }
+        
+        .dashboard-iframe-container {
+            position: relative;
+            width: 100%;
+            height: calc(90vh - 130px);
+            background: white;
+            border-radius: 1rem;
+            overflow: hidden;
+        }
+        
+        .dashboard-iframe-container.single {
+            height: calc(90vh - 100px);
+        }
+        
+        .dashboard-iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            border-radius: 0.5rem;
+            background: white;
+        }
+        
+        .iframe-loading {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.95);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.1rem;
+            color: #2c7da0;
+            gap: 0.8rem;
+            z-index: 5;
+            flex-direction: column;
+        }
+        
+        .modal-footer {
+            padding: 0.8rem 1.5rem;
+            background: #1a2a4f;
+            border-top: 1px solid rgba(255,255,255,0.2);
+            display: flex;
+            justify-content: flex-end;
+        }
+        
+        .btn-close-modal {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 0.5rem 1.5rem;
+            border-radius: 2rem;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        
+        .btn-close-modal:hover {
+            background: #c0392b;
+            transform: scale(0.98);
+        }
+
+        @media (max-width: 600px) {
+            .dashboard-card {
+                padding: 1.5rem;
+            }
+            .info-row {
+                flex-direction: column;
+                gap: 0.3rem;
+            }
+            th, td {
+                display: block;
+            }
+            th {
+                display: none;
+            }
+            td {
+                border-bottom: none;
+                position: relative;
+                padding-left: 50%;
+            }
+            td:before {
+                content: attr(data-label);
+                position: absolute;
+                left: 0.75rem;
+                font-weight: bold;
+            }
+            .product-name-cell {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .edit-name-form {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .edit-buttons {
+                justify-content: flex-start;
+            }
+            .dashboard-access-card {
+                flex-direction: column;
+                text-align: center;
+            }
+            .dashboard-access-info {
+                justify-content: center;
+            }
+            .dashboard-tab {
+                font-size: 0.7rem;
+                padding: 0.4rem 0.8rem;
+            }
+            .modal-content {
+                width: 98%;
+                height: 95vh;
+            }
+            .dashboard-iframe-container {
+                height: calc(95vh - 120px);
+            }
+        }
+    </style>
 </head>
 <body>
-    <div class="orb orb-1"></div>
-    <div class="orb orb-2"></div>
+<div id="loading">Memuat dashboard...</div>
+<div id="content" style="display: none;">
+    <div class="dashboard-card">
+        <h1><i class="fas fa-chalkboard-user"></i> Dashboard User</h1>
+        <div class="sub">Produk yang dipesan & akses dashboard</div>
 
-    <div id="loading" class="loading-screen">
-        <div class="loading-content">
-            <div class="loading-spinner"></div>
-            <div class="loading-text">Memuat dashboard...</div>
+        <div class="info-card">
+            <div class="info-row">
+                <span class="info-label">Email Anda:</span>
+                <span id="userEmail" class="info-value">-</span>
+            </div>
         </div>
-    </div>
 
-    <div id="content" style="display: none;">
-        <div class="container">
-            <div class="dashboard-card">
-                <div class="card-header">
-                    <h1>
-                        <i class="fas fa-chalkboard-user"></i> 
-                        Dashboard User
-                    </h1>
-                    <div class="sub">
-                        <i class="fas fa-layer-group"></i> Kelola produk dan akses dashboard Anda
-                    </div>
+        <!-- TOMBOL AKSES DASHBOARD - SATU TOMBOL UTAMA -->
+        <div class="dashboard-access-card">
+            <div class="dashboard-access-info">
+                <h3><i class="fas fa-tachometer-alt"></i> Akses Semua Dashboard</h3>
+                <div class="dashboard-badge">
+                    <span id="dashboardCount">0</span> Dashboard Tersedia
                 </div>
-                
-                <div class="card-content">
-                    <div class="info-card">
-                        <div class="info-row" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
-                            <span class="info-label"><i class="fas fa-envelope"></i> Email Anda</span>
-                            <span id="userEmail" class="info-value">-</span>
-                        </div>
-                    </div>
-
-                    <!-- TOMBOL AKSES DASHBOARD - SATU TOMBOL UTAMA -->
-                    <div class="access-card">
-                        <div class="access-info">
-                            <div class="access-title">
-                                <i class="fas fa-tachometer-alt"></i>
-                                <span>Akses Semua Dashboard</span>
-                            </div>
-                            <div class="badge">
-                                <span id="dashboardCount">0</span> Dashboard Tersedia
-                            </div>
-                            <div class="status-text" id="dashboardStatus">
-                                <i class="fas fa-spinner fa-pulse"></i> Memuat...
-                            </div>
-                        </div>
-                        <button id="openAllDashboardBtn" class="btn-primary" disabled>
-                            <i class="fas fa-chalkboard"></i> Buka Semua Dashboard
-                        </button>
-                    </div>
-
-                    <div class="section-title">
-                        <i class="fas fa-folder-open"></i>
-                        <span>Daftar Produk Saya</span>
-                    </div>
-                    <div class="info-note">
-                        <i class="fas fa-info-circle"></i> Produk dengan status "Dashboard Tersedia" akan muncul saat tombol "Buka Semua Dashboard" diklik
-                    </div>
-                    
-                    <div class="table-wrapper">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Nama Produk</th>
-                                    <th>Kode Produk</th>
-                                    <th>Status</th>
-                                    <th>Hapus</th>
-                                </tr>
-                            </thead>
-                            <tbody id="productsTableBody">
-                                <tr><td colspan="4" style="text-align: center; padding: 2rem;">Memuat...</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <hr style="margin: 1.5rem 0; border-color: rgba(56, 189, 248, 0.1);">
-
-                    <div class="section-title">
-                        <i class="fas fa-plus-circle"></i>
-                        <span>Tambah Produk Baru</span>
-                    </div>
-                    <form id="addProductForm">
-                        <div class="form-group">
-                            <input type="text" id="newProductCode" placeholder="Masukkan kode produk yang ingin dipesan" required>
-                        </div>
-                        <button type="submit" class="btn-submit">
-                            <i class="fas fa-plus"></i> Tambah Produk
-                        </button>
-                    </form>
-
-                    <button id="logoutBtn" class="btn-logout">
-                        <i class="fas fa-sign-out-alt"></i> Logout
-                    </button>
-                    
-                    <div class="footer">
-                        <i class="fas fa-info-circle"></i> Hanya kode produk yang sudah didaftarkan admin yang dapat ditambahkan. Anda dapat mengedit nama produk atau menghapus produk kapan saja.
-                    </div>
+                <div class="dashboard-status" id="dashboardStatus">
+                    <i class="fas fa-spinner fa-pulse"></i> Memuat...
                 </div>
             </div>
+            <button id="openAllDashboardBtn" class="btn-open-all" disabled>
+                <i class="fas fa-chalkboard"></i> Buka Semua Dashboard
+            </button>
+        </div>
+
+        <h3><i class="fas fa-folder-open"></i> Daftar Produk Saya</h3>
+        <div style="margin-bottom: 0.8rem; font-size: 0.8rem; color: #2c7da0;">
+            <i class="fas fa-info-circle"></i> Produk dengan status "Dashboard Tersedia" akan muncul saat tombol "Buka Semua Dashboard" diklik
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Nama Produk</th>
+                    <th>Kode Produk</th>
+                    <th>Status</th>
+                    <th>Hapus</th>
+                </tr>
+            </thead>
+            <tbody id="productsTableBody">
+                <tr><td colspan="4">Memuat...</td></tr>
+            </tbody>
+        </table>
+
+        <hr style="margin: 1.5rem 0; border-color: #dce5f0;">
+
+        <h3><i class="fas fa-plus-circle"></i> Tambah Produk Baru</h3>
+        <form id="addProductForm">
+            <div class="form-group">
+                <input type="text" id="newProductCode" placeholder="Masukkan kode produk yang ingin dipesan" required>
+            </div>
+            <button type="submit" style="width: 100%;">Tambah Produk</button>
+        </form>
+
+        <div id="message" class="message"></div>
+        <button id="logoutBtn" class="logout-btn">Logout</button>
+        <footer>
+            <i class="fas fa-info-circle"></i> Hanya kode produk yang sudah didaftarkan admin yang dapat ditambahkan. Anda dapat mengedit nama produk atau menghapus produk kapan saja.
+        </footer>
+    </div>
+</div>
+
+<!-- Modal untuk menampilkan semua dashboard -->
+<div id="dashboardModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2><i class="fas fa-tachometer-alt"></i> <span id="modalTitle">Dashboard</span></h2>
+            <span class="close-modal">&times;</span>
+        </div>
+        <div class="modal-body" id="dashboardsContainer">
+            <!-- Dashboard iframes akan dimuat di sini -->
+        </div>
+        <div class="modal-footer">
+            <button id="closeModalBtn" class="btn-close-modal">Tutup</button>
         </div>
     </div>
+</div>
 
-    <div id="message" class="message"></div>
-
-    <!-- Modal untuk menampilkan semua dashboard -->
-    <div id="dashboardModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2><i class="fas fa-tachometer-alt"></i> <span id="modalTitle">Dashboard</span></h2>
-                <span class="close-modal">&times;</span>
-            </div>
-            <div class="modal-body" id="dashboardsContainer">
-                <!-- Dashboard iframes akan dimuat di sini -->
-            </div>
-            <div class="modal-footer">
-                <button id="closeModalBtn" class="btn-close-modal">Tutup</button>
-            </div>
-        </div>
-    </div>
+<!-- Font Awesome -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </body>
 </html>
