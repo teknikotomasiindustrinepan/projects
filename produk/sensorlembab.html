@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Soil Moisture Monitor - Real-time</title>
+    <title>Soil Moisture Monitor - Real-time Graph</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -19,7 +21,7 @@
         }
 
         .container {
-            max-width: 600px;
+            max-width: 800px;
             margin: 0 auto;
         }
 
@@ -33,6 +35,7 @@
 
         .header {
             text-align: center;
+            margin-bottom: 20px;
         }
 
         .header h1 {
@@ -41,374 +44,337 @@
             margin-bottom: 10px;
         }
 
-        .status-card {
+        .value-card {
             text-align: center;
-        }
-
-        .status-badge {
-            display: inline-block;
-            padding: 8px 20px;
-            border-radius: 50px;
-            font-weight: bold;
-            font-size: 14px;
-            margin-top: 10px;
-        }
-
-        .status-active {
-            background: #10b981;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            animation: pulse 2s infinite;
-        }
-
-        .status-inactive {
-            background: #ef4444;
-            color: white;
-        }
-
-        .status-waiting {
-            background: #f59e0b;
-            color: white;
-        }
-
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.7; }
-            100% { opacity: 1; }
-        }
-
-        .sensor-card {
-            text-align: center;
         }
 
         .moisture-value {
-            font-size: 48px;
+            font-size: 64px;
             font-weight: bold;
             margin: 20px 0;
         }
 
         .moisture-label {
-            color: #666;
             font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .unit {
+            font-size: 24px;
         }
 
         .progress-bar {
             width: 100%;
-            height: 30px;
-            background: #e5e7eb;
-            border-radius: 15px;
+            height: 20px;
+            background: rgba(255,255,255,0.3);
+            border-radius: 10px;
             overflow: hidden;
-            margin: 20px 0;
+            margin-top: 15px;
         }
 
         .progress-fill {
             height: 100%;
             transition: width 0.3s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 12px;
-            font-weight: bold;
-        }
-
-        .relay-status {
-            margin-top: 20px;
-            padding: 15px;
+            background: #ffd700;
             border-radius: 10px;
-            background: #f3f4f6;
         }
 
-        .relay-on {
-            color: #10b981;
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 15px;
+            font-size: 14px;
+        }
+
+        .status {
+            padding: 5px 10px;
+            border-radius: 20px;
             font-weight: bold;
         }
 
-        .relay-off {
-            color: #ef4444;
-            font-weight: bold;
+        .status-wet {
+            background: #10b981;
+            color: white;
         }
 
-        .info-card {
-            font-size: 12px;
-            color: #666;
-            text-align: center;
+        .status-dry {
+            background: #f59e0b;
+            color: white;
+        }
+
+        .status-very-dry {
+            background: #ef4444;
+            color: white;
         }
 
         .last-update {
             font-size: 12px;
-            color: #999;
+            color: #666;
             margin-top: 15px;
+            text-align: center;
         }
 
-        .threshold-info {
-            background: #fef3c7;
-            padding: 10px;
-            border-radius: 10px;
-            margin-top: 15px;
-            font-size: 12px;
-        }
-
-        .hidden {
-            display: none;
-        }
-
-        .error-message {
-            background: #fee2e2;
-            color: #dc2626;
-            padding: 15px;
-            border-radius: 10px;
-            margin-top: 15px;
-            font-size: 14px;
+        canvas {
+            max-height: 300px;
+            width: 100%;
         }
 
         button {
             background: #3b82f6;
             color: white;
             border: none;
-            padding: 10px 20px;
+            padding: 8px 16px;
             border-radius: 10px;
-            margin-top: 10px;
             cursor: pointer;
-            font-size: 14px;
+            font-size: 12px;
+            margin-top: 10px;
         }
 
         button:hover {
             background: #2563eb;
         }
+
+        .connection-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            margin-left: 10px;
+        }
+
+        .connected {
+            background: #10b981;
+            color: white;
+        }
+
+        .disconnected {
+            background: #ef4444;
+            color: white;
+        }
     </style>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
 </head>
 <body>
     <div class="container">
         <div class="card header">
             <h1>💧 Soil Moisture Monitor</h1>
-            <p>Real-time Monitoring</p>
+            <p>Real-time Kelembaban Tanah</p>
+            <div>
+                MQTT: <span id="mqttConnectionBadge" class="connection-badge disconnected">Menghubungkan...</span>
+            </div>
         </div>
 
-        <div class="card status-card">
-            <h3>📡 Status NodeMCU</h3>
-            <div id="statusBadge" class="status-badge status-waiting">⏳ Menunggu koneksi...</div>
-            <div id="wifiInfo" style="margin-top: 10px; font-size: 12px; color: #666;"></div>
-            <button onclick="forceReconnect()" style="margin-top: 10px;">🔄 Refresh Koneksi</button>
-        </div>
-
-        <div id="dataCard" class="card sensor-card hidden">
-            <h3>🌱 Kelembaban Tanah</h3>
-            <div class="moisture-value" id="moistureValue">---</div>
-            <div class="moisture-label">Nilai Sensor (0-1024)</div>
-            
+        <div class="card value-card">
+            <div class="moisture-label">Kelembaban Tanah</div>
+            <div class="moisture-value">
+                <span id="moistureValue">---</span><span class="unit"></span>
+            </div>
             <div class="progress-bar">
-                <div class="progress-fill" id="progressFill" style="width: 0%;">0%</div>
+                <div class="progress-fill" id="progressFill" style="width: 0%;"></div>
             </div>
-            
-            <div class="relay-status">
-                Status Pompa: <span id="relayStatus">---</span>
-            </div>
-            
-            <div class="threshold-info">
-                💡 <strong>Informasi:</strong><br>
-                • Nilai < 700 = Tanah Lembab → Pompa OFF<br>
-                • Nilai ≥ 700 = Tanah Kering → Pompa ON
+            <div class="info-row">
+                <span>💧 Lembab</span>
+                <span id="statusText">Menunggu data...</span>
+                <span>🌵 Kering</span>
             </div>
         </div>
 
-        <div id="offlineMessage" class="card error-message hidden">
-            ⚠️ <strong>NodeMCU Offline</strong><br>
-            NodeMCU tidak terhubung ke WiFi atau sedang offline.<br>
-            Data tidak dapat ditampilkan.
+        <div class="card">
+            <h3 style="margin-bottom: 15px;">📈 Grafik Kelembaban (60 detik terakhir)</h3>
+            <canvas id="moistureChart"></canvas>
+            <button onclick="resetChart()">🔄 Reset Grafik</button>
         </div>
 
-        <div class="card info-card">
-            <div id="lastUpdate" class="last-update">Terakhir update: ---</div>
-            <div style="margin-top: 10px;">
-                MQTT Server: broker.hivemq.com<br>
-                Topic: iot/soil/moisture
+        <div class="card">
+            <div class="last-update" id="lastUpdate">
+                Terakhir update: ---
+            </div>
+            <div style="font-size: 11px; color: #999; text-align: center; margin-top: 10px;">
+                Topic: iot/soil/moisture | Server: broker.hivemq.com
             </div>
         </div>
     </div>
 
     <script>
         // Konfigurasi MQTT
-        const broker = "wss://broker.hivemq.com:8000/mqtt";
+        const broker = "wss://broker.hivemq.com:8884/mqtt";
         const topic = "iot/soil/moisture";
-        const statusTopic = "iot/soil/status";
         
+        // Data untuk grafik (max 60 data points = 5 menit jika 5 detik sekali)
+        let moistureData = [];
+        let timeLabels = [];
+        let chart = null;
+        let lastValue = 0;
+        
+        // MQTT Client
         let client = null;
-        let lastValue = null;
-        let isOnline = false;
-        let reconnectAttempts = 0;
-        let lastDataTime = 0;
-        let connectionCheckInterval = null;
-
-        // Elemen DOM
-        const statusBadge = document.getElementById('statusBadge');
-        const wifiInfo = document.getElementById('wifiInfo');
-        const dataCard = document.getElementById('dataCard');
-        const offlineMessage = document.getElementById('offlineMessage');
-        const moistureValue = document.getElementById('moistureValue');
-        const progressFill = document.getElementById('progressFill');
-        const relayStatus = document.getElementById('relayStatus');
-        const lastUpdateElem = document.getElementById('lastUpdate');
-
-        const THRESHOLD = 700;
-
-        // Update tampilan dashboard
-        function updateDashboard(value) {
+        
+        // Inisialisasi Chart
+        function initChart() {
+            const ctx = document.getElementById('moistureChart').getContext('2d');
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: timeLabels,
+                    datasets: [{
+                        label: 'Kelembaban Tanah',
+                        data: moistureData,
+                        borderColor: 'rgb(59, 130, 246)',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 3,
+                        pointBackgroundColor: 'rgb(59, 130, 246)'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 1024,
+                            title: {
+                                display: true,
+                                text: 'Nilai Sensor (0-1024)'
+                            },
+                            grid: {
+                                color: 'rgba(0,0,0,0.05)'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Waktu'
+                            },
+                            ticks: {
+                                maxRotation: 45,
+                                minRotation: 45
+                            }
+                        }
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `Kelembaban: ${context.raw}`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Update grafik dengan data baru
+        function updateChart(value) {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            
+            // Tambah data baru
+            moistureData.push(value);
+            timeLabels.push(timeStr);
+            
+            // Hanya simpan 60 data terakhir (5 menit jika 5 detik sekali)
+            if (moistureData.length > 60) {
+                moistureData.shift();
+                timeLabels.shift();
+            }
+            
+            // Update chart
+            if (chart) {
+                chart.data.datasets[0].data = moistureData;
+                chart.data.labels = timeLabels;
+                chart.update();
+            }
+        }
+        
+        // Update tampilan nilai
+        function updateDisplay(value) {
             const numValue = parseInt(value);
             if (isNaN(numValue)) return;
             
             lastValue = numValue;
-            lastDataTime = Date.now();
             
-            // Update nilai sensor
-            moistureValue.innerHTML = numValue;
+            // Update angka
+            document.getElementById('moistureValue').innerHTML = numValue;
             
-            // Hitung persentase
-            const percentage = Math.min(100, Math.max(0, Math.round((numValue / 1024) * 100)));
-            progressFill.style.width = percentage + '%';
-            progressFill.innerHTML = percentage + '%';
+            // Update progress bar (0-1024 ke 0-100%)
+            const percentage = (numValue / 1024) * 100;
+            document.getElementById('progressFill').style.width = percentage + '%';
             
-            // Update warna dan status relay
-            if (numValue >= THRESHOLD) {
-                progressFill.style.background = "linear-gradient(90deg, #f59e0b, #ef4444)";
-                relayStatus.innerHTML = '🔴 OFF (Tanah Kering)';
-                relayStatus.className = 'relay-off';
+            // Update warna progress bar berdasarkan nilai
+            const progressFill = document.getElementById('progressFill');
+            if (numValue >= 700) {
+                progressFill.style.background = '#ef4444';
+                document.getElementById('statusText').innerHTML = '🌵 Kering - Perlu Penyiraman';
+                document.getElementById('statusText').className = 'status status-very-dry';
+            } else if (numValue >= 400) {
+                progressFill.style.background = '#f59e0b';
+                document.getElementById('statusText').innerHTML = '💧 Lembab - Cukup';
+                document.getElementById('statusText').className = 'status status-dry';
             } else {
-                progressFill.style.background = "linear-gradient(90deg, #10b981, #34d399)";
-                relayStatus.innerHTML = '🟢 ON (Tanah Lembab)';
-                relayStatus.className = 'relay-on';
+                progressFill.style.background = '#10b981';
+                document.getElementById('statusText').innerHTML = '💧💧 Sangat Lembab - Basah';
+                document.getElementById('statusText').className = 'status status-wet';
             }
             
             // Update waktu
             const now = new Date();
-            lastUpdateElem.innerHTML = `Terakhir update: ${now.toLocaleTimeString('id-ID')}`;
-        }
-
-        // Update status online/offline
-        function updateOnlineStatus(online) {
-            isOnline = online;
+            document.getElementById('lastUpdate').innerHTML = `Terakhir update: ${now.toLocaleTimeString('id-ID')} | Nilai: ${numValue}`;
             
-            if (online && lastValue !== null) {
-                // Online dan ada data
-                statusBadge.className = 'status-badge status-active';
-                statusBadge.innerHTML = '✅ AKTIF - Online';
-                wifiInfo.innerHTML = '📶 NodeMCU terhubung dan mengirim data';
-                dataCard.classList.remove('hidden');
-                offlineMessage.classList.add('hidden');
-            } else if (online && lastValue === null) {
-                // Online tapi belum ada data
-                statusBadge.className = 'status-badge status-waiting';
-                statusBadge.innerHTML = '⏳ Menunggu data...';
-                wifiInfo.innerHTML = 'MQTT terhubung, menunggu data dari NodeMCU...';
-                dataCard.classList.add('hidden');
-                offlineMessage.classList.add('hidden');
-            } else {
-                // Offline
-                statusBadge.className = 'status-badge status-inactive';
-                statusBadge.innerHTML = '❌ TIDAK AKTIF - Offline';
-                wifiInfo.innerHTML = '⚠️ NodeMCU tidak terhubung ke WiFi atau sedang offline';
-                dataCard.classList.add('hidden');
-                offlineMessage.classList.remove('hidden');
-                moistureValue.innerHTML = '---';
-                progressFill.style.width = '0%';
-                progressFill.innerHTML = '0%';
-                relayStatus.innerHTML = '---';
-            }
+            // Update grafik
+            updateChart(numValue);
         }
-
-        // Cek koneksi dan data timeout
-        function checkConnection() {
-            const now = Date.now();
-            
-            // Jika sudah 15 detik tidak ada data, anggap offline
-            if (lastDataTime > 0 && (now - lastDataTime) > 15000) {
-                if (isOnline) {
-                    console.log("No data for 15 seconds, marking as offline");
-                    updateOnlineStatus(false);
-                }
-            }
-        }
-
+        
         // MQTT Connection Lost
         function onConnectionLost(response) {
-            console.log("Connection lost: " + (response.errorMessage || "Unknown error"));
-            updateOnlineStatus(false);
+            console.log("MQTT Connection Lost");
+            document.getElementById('mqttConnectionBadge').innerHTML = 'Terputus';
+            document.getElementById('mqttConnectionBadge').className = 'connection-badge disconnected';
             
-            // Reconnect setelah 5 detik
             setTimeout(() => {
-                if (client && !client.isConnected()) {
-                    connectMQTT();
-                }
+                connectMQTT();
             }, 5000);
         }
-
+        
         // MQTT Message Arrived
         function onMessageArrived(message) {
-            console.log("Message received on " + message.destinationName + ": " + message.payloadString);
-            
             const payload = message.payloadString;
-            
-            // Reset status online
-            updateOnlineStatus(true);
-            
-            // Update dashboard dengan nilai sensor
-            updateDashboard(payload);
+            console.log("Data diterima:", payload);
+            updateDisplay(payload);
         }
-
+        
         // MQTT Connect Success
         function onConnect() {
-            console.log("MQTT Connected successfully!");
-            reconnectAttempts = 0;
+            console.log("MQTT Connected!");
+            document.getElementById('mqttConnectionBadge').innerHTML = 'Terhubung';
+            document.getElementById('mqttConnectionBadge').className = 'connection-badge connected';
             
-            // Subscribe ke topics
             client.subscribe(topic);
-            client.subscribe(statusTopic);
-            console.log("Subscribed to: " + topic + " and " + statusTopic);
-            
-            // Reset status
-            updateOnlineStatus(false);
-            lastDataTime = 0;
-            lastValue = null;
-            
-            // Set timeout untuk deteksi data
-            setTimeout(() => {
-                if (lastDataTime === 0) {
-                    wifiInfo.innerHTML = 'Menunggu data dari NodeMCU... Pastikan NodeMCU terhubung ke WiFi';
-                }
-            }, 5000);
+            console.log("Subscribe ke topic:", topic);
         }
-
+        
         // MQTT Connect Failed
         function onFailure(err) {
-            console.error("MQTT Connection Failed: ", err);
-            reconnectAttempts++;
-            updateOnlineStatus(false);
-            
-            // Retry dengan exponential backoff
-            const delay = Math.min(30000, 5000 * Math.pow(1.5, reconnectAttempts));
-            console.log(`Reconnecting in ${delay/1000} seconds...`);
+            console.error("MQTT Connection Failed:", err);
+            document.getElementById('mqttConnectionBadge').innerHTML = 'Gagal';
+            document.getElementById('mqttConnectionBadge').className = 'connection-badge disconnected';
             
             setTimeout(() => {
-                if (reconnectAttempts < 20) {
-                    connectMQTT();
-                } else {
-                    wifiInfo.innerHTML = 'Gagal terhubung ke MQTT broker. Periksa koneksi internet.';
-                }
-            }, delay);
+                connectMQTT();
+            }, 10000);
         }
-
-        // Connect to MQTT Broker
+        
+        // Connect ke MQTT
         function connectMQTT() {
             if (client && client.isConnected()) {
-                console.log("Already connected");
                 return;
             }
             
-            console.log("Connecting to MQTT broker...");
-            
-            // Buat client ID unik
-            const clientId = "web_dashboard_" + Math.random().toString(36).substr(2, 8);
-            
+            const clientId = "web_" + Math.random().toString(36).substr(2, 8);
             client = new Paho.MQTT.Client(broker, clientId);
             
             client.onConnectionLost = onConnectionLost;
@@ -418,43 +384,38 @@
                 timeout: 10,
                 useSSL: true,
                 keepAliveInterval: 30,
-                cleanSession: true,
                 onSuccess: onConnect,
                 onFailure: onFailure
             };
             
             client.connect(options);
         }
-
-        // Force reconnect
-        function forceReconnect() {
-            console.log("Force reconnecting...");
-            if (client && client.isConnected()) {
-                client.disconnect();
-            }
-            reconnectAttempts = 0;
-            setTimeout(() => {
-                connectMQTT();
-            }, 1000);
-        }
-
-        // Start connection checker
-        function startConnectionChecker() {
-            setInterval(() => {
-                checkConnection();
-            }, 5000);
-        }
-
-        // Inisialisasi
-        connectMQTT();
-        startConnectionChecker();
         
-        // Cleanup on page unload
-        window.addEventListener('beforeunload', () => {
-            if (client && client.isConnected()) {
-                client.disconnect();
+        // Reset grafik
+        function resetChart() {
+            moistureData = [];
+            timeLabels = [];
+            if (lastValue > 0) {
+                updateChart(lastValue);
+            } else {
+                chart.data.datasets[0].data = [];
+                chart.data.labels = [];
+                chart.update();
             }
-        });
+        }
+        
+        // Inisialisasi
+        initChart();
+        connectMQTT();
+        
+        // Test dengan data random jika tidak ada MQTT (untuk testing tampilan)
+        // Hapus comment untuk testing tanpa NodeMCU
+        /*
+        let testInterval = setInterval(() => {
+            const testValue = Math.floor(Math.random() * 1024);
+            updateDisplay(testValue);
+        }, 5000);
+        */
     </script>
 </body>
 </html>
