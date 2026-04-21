@@ -38,12 +38,20 @@
         const messageDiv = document.getElementById('message');
         const logoutBtn = document.getElementById('logoutBtn');
         
+        // Tombol akses dashboard (satu tombol saja)
+        const openAllDashboardBtn = document.getElementById('openAllDashboardBtn');
+        const dashboardCountSpan = document.getElementById('dashboardCount');
+        const dashboardStatusSpan = document.getElementById('dashboardStatus');
+        
         // Modal elements
         const modal = document.getElementById('dashboardModal');
         const modalTitle = document.getElementById('modalTitle');
         const dashboardsContainer = document.getElementById('dashboardsContainer');
         const closeModal = document.querySelector('.close-modal');
         const closeModalBtn = document.getElementById('closeModalBtn');
+
+        // Data produk (disimpan untuk akses cepat)
+        let currentProductsData = [];
 
         // Helper: tampilkan pesan
         function showMessage(text, isError = true) {
@@ -84,6 +92,26 @@
             }
         }
 
+        // Update tombol akses dashboard berdasarkan produk yang tersedia
+        function updateDashboardButton() {
+            const activeDashboards = currentProductsData.filter(p => p.hasLink && p.link);
+            const count = activeDashboards.length;
+            
+            if (count === 0) {
+                openAllDashboardBtn.disabled = true;
+                dashboardCountSpan.textContent = '0';
+                dashboardStatusSpan.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Belum ada produk dengan link dashboard';
+                openAllDashboardBtn.style.opacity = '0.6';
+                openAllDashboardBtn.style.cursor = 'not-allowed';
+            } else {
+                openAllDashboardBtn.disabled = false;
+                dashboardCountSpan.textContent = count;
+                dashboardStatusSpan.innerHTML = `<i class="fas fa-check-circle"></i> ${count} dashboard siap ditampilkan`;
+                openAllDashboardBtn.style.opacity = '1';
+                openAllDashboardBtn.style.cursor = 'pointer';
+            }
+        }
+
         // Muat data user dan daftar produk
         async function loadUserDashboard(user) {
             try {
@@ -108,12 +136,15 @@
                 
                 userEmailSpan.textContent = user.email;
 
+                // Reset data produk
+                currentProductsData = [];
+                
                 productsTableBody.innerHTML = '';
                 if (products.length === 0) {
-                    productsTableBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Belum ada produk. Tambahkan menggunakan form di bawah.</td></tr>';
+                    productsTableBody.innerHTML = '<tr><td colspan="4" style="text-align: center;">Belum ada produk. Tambahkan menggunakan form di bawah.</td></tr>';
+                    updateDashboardButton();
                 } else {
                     // Kumpulkan semua data produk terlebih dahulu
-                    const productsData = [];
                     for (const code of products) {
                         const productDocRef = doc(db, "products", code);
                         const productSnap = await getDoc(productDocRef);
@@ -129,7 +160,7 @@
                         const hasLink = link && link.trim() !== '';
                         const displayName = customNames[code] ? customNames[code] : defaultName;
                         
-                        productsData.push({
+                        currentProductsData.push({
                             code: code,
                             displayName: displayName,
                             link: link,
@@ -138,9 +169,9 @@
                     }
                     
                     // Urutkan berdasarkan nama
-                    productsData.sort((a, b) => a.displayName.localeCompare(b.displayName));
+                    currentProductsData.sort((a, b) => a.displayName.localeCompare(b.displayName));
                     
-                    for (const product of productsData) {
+                    for (const product of currentProductsData) {
                         const row = document.createElement('tr');
                         row.setAttribute('data-code', product.code);
                         row.innerHTML = `
@@ -156,51 +187,16 @@
                                 </div>
                             </td>
                             <td data-label="Kode Produk">${escapeHtml(product.code)}</td>
-                            <td data-label="Akses Dashboard">
-                                <button class="open-product-btn" data-link="${product.hasLink ? escapeHtml(product.link) : ''}" data-name="${escapeHtml(product.displayName)}" ${!product.hasLink ? 'disabled' : ''}>
-                                    <i class="fas fa-tachometer-alt"></i> Buka Dashboard
-                                </button>
-                            </td>
-                            <td data-label="Status">${product.hasLink ? '<span class="status-active">Aktif</span>' : '<span class="status-pending">Menunggu Link</span>'}</td>
+                            <td data-label="Status">${product.hasLink ? '<span class="status-active"><i class="fas fa-link"></i> Dashboard Tersedia</span>' : '<span class="status-pending"><i class="fas fa-clock"></i> Menunggu Link</span>'}</td>
                             <td data-label="Hapus">
-                                <button class="delete-product-btn" data-code="${escapeHtml(product.code)}" title="Hapus produk">✖</button>
+                                <button class="delete-product-btn" data-code="${escapeHtml(product.code)}" title="Hapus produk">✖ Hapus</button>
                             </td>
                         `;
                         productsTableBody.appendChild(row);
                     }
 
-                    // Event listener untuk tombol buka dashboard (tampilkan semua dalam modal)
-                    document.querySelectorAll('.open-product-btn').forEach(btn => {
-                        btn.addEventListener('click', async () => {
-                            const link = btn.getAttribute('data-link');
-                            const productName = btn.getAttribute('data-name');
-                            
-                            if (!link) {
-                                showMessage('Link belum tersedia oleh admin', true);
-                                return;
-                            }
-                            
-                            // Kumpulkan semua link dari semua produk user yang memiliki link
-                            const allLinks = [];
-                            for (const product of productsData) {
-                                if (product.hasLink && product.link) {
-                                    allLinks.push({
-                                        name: product.displayName,
-                                        url: product.link,
-                                        code: product.code
-                                    });
-                                }
-                            }
-                            
-                            if (allLinks.length === 0) {
-                                showMessage('Tidak ada dashboard yang tersedia', true);
-                                return;
-                            }
-                            
-                            // Tampilkan modal dengan semua dashboard
-                            showAllDashboards(allLinks);
-                        });
-                    });
+                    // Update tombol akses dashboard
+                    updateDashboardButton();
 
                     // Event listener untuk tombol hapus produk
                     document.querySelectorAll('.delete-product-btn').forEach(btn => {
@@ -292,26 +288,33 @@
         }
         
         // Tampilkan semua dashboard dalam modal
-        function showAllDashboards(dashboards) {
+        function showAllDashboards() {
+            const activeDashboards = currentProductsData.filter(p => p.hasLink && p.link);
+            
+            if (activeDashboards.length === 0) {
+                showMessage('Tidak ada dashboard yang tersedia', true);
+                return;
+            }
+            
             // Kosongkan container
             dashboardsContainer.innerHTML = '';
             
             // Set judul modal
-            modalTitle.textContent = `Dashboard (${dashboards.length} Produk)`;
+            modalTitle.textContent = `Dashboard (${activeDashboards.length} Produk)`;
             
             // Buat tab navigasi jika lebih dari 1 dashboard
-            if (dashboards.length > 1) {
+            if (activeDashboards.length > 1) {
                 const tabsContainer = document.createElement('div');
                 tabsContainer.className = 'dashboard-tabs';
                 
                 const tabsContent = document.createElement('div');
                 tabsContent.className = 'dashboard-tabs-content';
                 
-                dashboards.forEach((dashboard, index) => {
+                activeDashboards.forEach((dashboard, index) => {
                     const tab = document.createElement('button');
                     tab.className = `dashboard-tab ${index === 0 ? 'active' : ''}`;
                     tab.setAttribute('data-tab-index', index);
-                    tab.innerHTML = `<i class="fas fa-chart-line"></i> ${escapeHtml(dashboard.name)}`;
+                    tab.innerHTML = `<i class="fas fa-chart-line"></i> ${escapeHtml(dashboard.displayName)}`;
                     tab.addEventListener('click', () => {
                         // Aktifkan tab yang diklik
                         document.querySelectorAll('.dashboard-tab').forEach(t => t.classList.remove('active'));
@@ -329,21 +332,27 @@
                     iframeContainer.style.display = index === 0 ? 'block' : 'none';
                     
                     const iframe = document.createElement('iframe');
-                    iframe.src = dashboard.url + (dashboard.url.includes('?') ? '&' : '?') + 'embedded=true';
-                    iframe.title = dashboard.name;
+                    iframe.src = dashboard.link + (dashboard.link.includes('?') ? '&' : '?') + 'embedded=true';
+                    iframe.title = dashboard.displayName;
                     iframe.className = 'dashboard-iframe';
-                    iframe.sandbox = 'allow-same-origin allow-scripts allow-popups allow-forms allow-modals';
+                    iframe.sandbox = 'allow-same-origin allow-scripts allow-popups allow-forms allow-modals allow-popups-to-escape-sandbox';
                     
                     // Loading indicator untuk setiap iframe
                     const loadingOverlay = document.createElement('div');
                     loadingOverlay.className = 'iframe-loading';
-                    loadingOverlay.innerHTML = '<i class="fas fa-spinner fa-pulse"></i> Memuat dashboard...';
+                    loadingOverlay.innerHTML = '<i class="fas fa-spinner fa-pulse"></i> Memuat dashboard ' + escapeHtml(dashboard.displayName) + '...';
                     
                     iframeContainer.appendChild(loadingOverlay);
                     iframeContainer.appendChild(iframe);
                     
                     iframe.onload = () => {
                         loadingOverlay.style.display = 'none';
+                    };
+                    
+                    iframe.onerror = () => {
+                        loadingOverlay.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Gagal memuat dashboard. Pastikan link valid.';
+                        loadingOverlay.style.background = 'rgba(231, 76, 60, 0.9)';
+                        loadingOverlay.style.color = 'white';
                     };
                     
                     tabsContent.appendChild(iframeContainer);
@@ -353,15 +362,15 @@
                 dashboardsContainer.appendChild(tabsContent);
             } else {
                 // Single dashboard - tampilkan langsung tanpa tab
-                const dashboard = dashboards[0];
+                const dashboard = activeDashboards[0];
                 const iframeContainer = document.createElement('div');
                 iframeContainer.className = 'dashboard-iframe-container single';
                 
                 const iframe = document.createElement('iframe');
-                iframe.src = dashboard.url + (dashboard.url.includes('?') ? '&' : '?') + 'embedded=true';
-                iframe.title = dashboard.name;
+                iframe.src = dashboard.link + (dashboard.link.includes('?') ? '&' : '?') + 'embedded=true';
+                iframe.title = dashboard.displayName;
                 iframe.className = 'dashboard-iframe';
-                iframe.sandbox = 'allow-same-origin allow-scripts allow-popups allow-forms allow-modals';
+                iframe.sandbox = 'allow-same-origin allow-scripts allow-popups allow-forms allow-modals allow-popups-to-escape-sandbox';
                 
                 const loadingOverlay = document.createElement('div');
                 loadingOverlay.className = 'iframe-loading';
@@ -372,6 +381,12 @@
                 
                 iframe.onload = () => {
                     loadingOverlay.style.display = 'none';
+                };
+                
+                iframe.onerror = () => {
+                    loadingOverlay.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Gagal memuat dashboard. Pastikan link valid.';
+                    loadingOverlay.style.background = 'rgba(231, 76, 60, 0.9)';
+                    loadingOverlay.style.color = 'white';
                 };
                 
                 dashboardsContainer.appendChild(iframeContainer);
@@ -459,6 +474,11 @@
             } else {
                 showMessage('Anda belum login', true);
             }
+        });
+        
+        // Tombol akses semua dashboard
+        openAllDashboardBtn.addEventListener('click', () => {
+            showAllDashboards();
         });
         
         // Modal event listeners
@@ -560,6 +580,72 @@
             word-break: break-all;
         }
 
+        /* Dashboard Access Card - Tombol Utama */
+        .dashboard-access-card {
+            background: linear-gradient(135deg, #1A2A4F, #2C3E66);
+            border-radius: 1.5rem;
+            padding: 1.2rem 1.5rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+            color: white;
+        }
+
+        .dashboard-access-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .dashboard-access-info h3 {
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .dashboard-badge {
+            background: rgba(255,255,255,0.2);
+            border-radius: 2rem;
+            padding: 0.3rem 1rem;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .dashboard-status {
+            font-size: 0.85rem;
+            opacity: 0.9;
+        }
+
+        .btn-open-all {
+            background: #27ae60;
+            color: white;
+            border: none;
+            padding: 0.8rem 1.8rem;
+            border-radius: 2rem;
+            font-weight: 700;
+            font-size: 1rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.8rem;
+            transition: 0.2s;
+        }
+
+        .btn-open-all:hover:not(:disabled) {
+            background: #1e8e4a;
+            transform: scale(0.98);
+        }
+
+        .btn-open-all:disabled {
+            background: #7f8c8d;
+            cursor: not-allowed;
+        }
+
         table {
             width: 100%;
             border-collapse: collapse;
@@ -580,37 +666,23 @@
         }
 
         button {
-            background: #1f3b4c;
-            color: white;
-            border: none;
-            padding: 0.5rem 1rem;
-            border-radius: 2rem;
-            cursor: pointer;
-            font-weight: 600;
             transition: 0.2s;
-        }
-
-        button:hover:not(:disabled) {
-            background: #0f2b3a;
-            transform: scale(0.98);
-        }
-
-        button:disabled {
-            background: #9aaebf;
-            cursor: not-allowed;
-        }
-
-        .open-product-btn {
-            background: #2c7da0;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
         }
 
         .delete-product-btn {
             background: #c0392b;
             padding: 0.3rem 0.8rem;
-            font-size: 0.9rem;
+            border-radius: 1.5rem;
+            border: none;
+            cursor: pointer;
+            color: white;
+            font-weight: 600;
+            font-size: 0.8rem;
+        }
+
+        .delete-product-btn:hover {
+            background: #a82315;
+            transform: scale(0.96);
         }
 
         .status-active {
@@ -666,6 +738,12 @@
             background: #c0392b;
             margin-top: 1rem;
             width: 100%;
+            padding: 0.8rem;
+            border-radius: 2rem;
+            border: none;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
         }
 
         #loading {
@@ -694,6 +772,10 @@
         .edit-name-btn {
             background: #f39c12;
             padding: 0.2rem 0.6rem;
+            border-radius: 1.5rem;
+            border: none;
+            cursor: pointer;
+            color: white;
             font-size: 0.8rem;
         }
         .edit-name-form {
@@ -708,6 +790,7 @@
             min-width: 120px;
             padding: 0.4rem 0.8rem;
             border-radius: 2rem;
+            border: 1px solid #cbd5e1;
         }
         .edit-buttons {
             display: flex;
@@ -716,6 +799,10 @@
         .edit-buttons button {
             padding: 0.3rem 0.8rem;
             font-size: 0.8rem;
+            border-radius: 1.5rem;
+            border: none;
+            cursor: pointer;
+            color: white;
         }
         .save-name-btn {
             background: #27ae60;
@@ -812,6 +899,7 @@
             cursor: pointer;
             transition: 0.2s;
             font-size: 0.85rem;
+            font-weight: 600;
         }
         
         .dashboard-tab:hover {
@@ -851,14 +939,15 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(255, 255, 255, 0.9);
+            background: rgba(255, 255, 255, 0.95);
             display: flex;
             justify-content: center;
             align-items: center;
-            font-size: 1.2rem;
+            font-size: 1.1rem;
             color: #2c7da0;
             gap: 0.8rem;
             z-index: 5;
+            flex-direction: column;
         }
         
         .modal-footer {
@@ -920,6 +1009,13 @@
             .edit-buttons {
                 justify-content: flex-start;
             }
+            .dashboard-access-card {
+                flex-direction: column;
+                text-align: center;
+            }
+            .dashboard-access-info {
+                justify-content: center;
+            }
             .dashboard-tab {
                 font-size: 0.7rem;
                 padding: 0.4rem 0.8rem;
@@ -948,22 +1044,37 @@
             </div>
         </div>
 
+        <!-- TOMBOL AKSES DASHBOARD - SATU TOMBOL UTAMA -->
+        <div class="dashboard-access-card">
+            <div class="dashboard-access-info">
+                <h3><i class="fas fa-tachometer-alt"></i> Akses Semua Dashboard</h3>
+                <div class="dashboard-badge">
+                    <span id="dashboardCount">0</span> Dashboard Tersedia
+                </div>
+                <div class="dashboard-status" id="dashboardStatus">
+                    <i class="fas fa-spinner fa-pulse"></i> Memuat...
+                </div>
+            </div>
+            <button id="openAllDashboardBtn" class="btn-open-all" disabled>
+                <i class="fas fa-chalkboard"></i> Buka Semua Dashboard
+            </button>
+        </div>
+
         <h3><i class="fas fa-folder-open"></i> Daftar Produk Saya</h3>
         <div style="margin-bottom: 0.8rem; font-size: 0.8rem; color: #2c7da0;">
-            <i class="fas fa-info-circle"></i> Klik tombol "Buka Dashboard" untuk melihat semua dashboard produk Anda sekaligus
+            <i class="fas fa-info-circle"></i> Produk dengan status "Dashboard Tersedia" akan muncul saat tombol "Buka Semua Dashboard" diklik
         </div>
         <table>
             <thead>
                 <tr>
                     <th>Nama Produk</th>
                     <th>Kode Produk</th>
-                    <th>Akses Dashboard</th>
                     <th>Status</th>
                     <th>Hapus</th>
                 </tr>
             </thead>
             <tbody id="productsTableBody">
-                <tr><td colspan="5">Memuat...</td></tr>
+                <tr><td colspan="4">Memuat...</td></tr>
             </tbody>
         </table>
 
