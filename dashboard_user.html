@@ -2,9 +2,686 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>User Dashboard | Produk Saya</title>
     <!-- Firebase SDK v9 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+            background-image: url('background_link.png');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            background-repeat: no-repeat;
+            position: relative;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 1.5rem;
+        }
+
+        /* Overlay gelap seperti index.html */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.55);
+            backdrop-filter: blur(2px);
+            z-index: 0;
+        }
+
+        /* Container */
+        .container {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* Loading Screen */
+        .loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(8px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .loading-content {
+            text-align: center;
+            background: rgba(255,255,255,0.1);
+            padding: 2rem 3rem;
+            border-radius: 2rem;
+            backdrop-filter: blur(10px);
+        }
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid rgba(255,255,255,0.2);
+            border-top-color: #2c7da0;
+            border-right-color: #2c7da0;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .loading-text {
+            color: #e2e8f0;
+            font-size: 0.9rem;
+        }
+
+        /* Dashboard Card */
+        .dashboard-card {
+            background: rgba(255, 255, 255, 0.96);
+            border-radius: 1.5rem;
+            box-shadow: 0 20px 35px -12px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+
+        /* Header */
+        .card-header {
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid #e2e8f0;
+            background: #ffffff;
+        }
+        .card-header h1 {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: #1f3b4c;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        .card-header h1 i {
+            color: #2c7da0;
+        }
+        .sub {
+            color: #64748b;
+            margin-top: 0.4rem;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        /* Content */
+        .card-content {
+            padding: 1.5rem 2rem;
+            background: #ffffff;
+        }
+
+        /* Info Card */
+        .info-card {
+            background: #f8fafc;
+            border-radius: 1rem;
+            padding: 0.9rem 1.2rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid #e2e8f0;
+        }
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+        .info-label {
+            font-weight: 600;
+            color: #1f3b4c;
+            font-size: 0.8rem;
+        }
+        .info-value {
+            color: #2c7da0;
+            font-weight: 500;
+            word-break: break-all;
+        }
+
+        /* Dashboard Access Card */
+        .access-card {
+            background: linear-gradient(135deg, #1f3b4c, #2c7da0);
+            border-radius: 1rem;
+            padding: 1rem 1.5rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+        .access-info {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+        .access-title {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: white;
+            font-weight: 600;
+        }
+        .access-title i {
+            font-size: 1.1rem;
+        }
+        .badge {
+            background: rgba(255,255,255,0.2);
+            border-radius: 2rem;
+            padding: 0.25rem 0.9rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: white;
+        }
+        .status-text {
+            font-size: 0.75rem;
+            color: rgba(255,255,255,0.8);
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+        .btn-primary {
+            background: #27ae60;
+            border: none;
+            padding: 0.6rem 1.3rem;
+            border-radius: 2rem;
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: white;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.2s;
+        }
+        .btn-primary:hover:not(:disabled) {
+            background: #1e8e4a;
+            transform: scale(0.98);
+        }
+        .btn-primary:disabled {
+            background: #94a3b8;
+            cursor: not-allowed;
+        }
+
+        /* Section Title */
+        .section-title {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            color: #1f3b4c;
+            font-size: 1rem;
+            font-weight: 600;
+        }
+        .section-title i {
+            color: #2c7da0;
+        }
+        .info-note {
+            font-size: 0.7rem;
+            color: #64748b;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            background: #f8fafc;
+            padding: 0.5rem 1rem;
+            border-radius: 2rem;
+            width: fit-content;
+        }
+
+        /* Table Styles - Professional & Selaras */
+        .table-wrapper {
+            overflow-x: auto;
+            border-radius: 0.75rem;
+            border: 1px solid #e2e8f0;
+            margin-bottom: 1.5rem;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+        th {
+            text-align: left;
+            padding: 1rem 1rem;
+            background: #f1f5f9;
+            color: #1f3b4c;
+            font-weight: 600;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        td {
+            padding: 1rem 1rem;
+            border-bottom: 1px solid #e2e8f0;
+            color: #334155;
+            vertical-align: middle;
+        }
+        tr:last-child td {
+            border-bottom: none;
+        }
+        tr:hover td {
+            background: #f8fafc;
+        }
+
+        /* Product Name Cell */
+        .product-name-cell {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            flex-wrap: wrap;
+        }
+        .product-name-text {
+            font-weight: 500;
+            color: #1e293b;
+        }
+        .edit-name-btn {
+            background: #fef3c7;
+            border: 1px solid #fcd34d;
+            padding: 0.2rem 0.6rem;
+            border-radius: 1rem;
+            cursor: pointer;
+            color: #d97706;
+            font-size: 0.7rem;
+            transition: all 0.2s;
+        }
+        .edit-name-btn:hover {
+            background: #fde68a;
+        }
+        .edit-name-form {
+            display: flex;
+            gap: 0.4rem;
+            flex-wrap: wrap;
+            align-items: center;
+            width: 100%;
+        }
+        .edit-name-input {
+            flex: 2;
+            min-width: 130px;
+            padding: 0.4rem 0.8rem;
+            border-radius: 1.5rem;
+            border: 1px solid #cbd5e1;
+            font-size: 0.8rem;
+        }
+        .edit-name-input:focus {
+            outline: none;
+            border-color: #2c7da0;
+        }
+        .edit-buttons {
+            display: flex;
+            gap: 0.3rem;
+        }
+        .save-name-btn {
+            background: #10b981;
+            border: none;
+            padding: 0.25rem 0.7rem;
+            border-radius: 1rem;
+            cursor: pointer;
+            color: white;
+            font-size: 0.7rem;
+        }
+        .cancel-name-btn {
+            background: #94a3b8;
+            border: none;
+            padding: 0.25rem 0.7rem;
+            border-radius: 1rem;
+            cursor: pointer;
+            color: white;
+            font-size: 0.7rem;
+        }
+
+        /* Status Badges */
+        .status-active {
+            color: #10b981;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            background: #d1fae5;
+            padding: 0.2rem 0.7rem;
+            border-radius: 2rem;
+            font-size: 0.7rem;
+        }
+        .status-pending {
+            color: #f59e0b;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            background: #fef3c7;
+            padding: 0.2rem 0.7rem;
+            border-radius: 2rem;
+            font-size: 0.7rem;
+        }
+
+        /* Delete Button */
+        .delete-product-btn {
+            background: #fee2e2;
+            border: 1px solid #fecaca;
+            padding: 0.3rem 0.8rem;
+            border-radius: 1.5rem;
+            cursor: pointer;
+            color: #dc2626;
+            font-weight: 500;
+            font-size: 0.7rem;
+            transition: all 0.2s;
+        }
+        .delete-product-btn:hover {
+            background: #fecaca;
+        }
+
+        /* Form Styles */
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 0.8rem 1.2rem;
+            border-radius: 1.5rem;
+            border: 1px solid #cbd5e1;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+        .form-group input:focus {
+            outline: none;
+            border-color: #2c7da0;
+            box-shadow: 0 0 0 3px rgba(44,125,160,0.1);
+        }
+        .form-group input::placeholder {
+            color: #94a3b8;
+        }
+        .btn-submit {
+            width: 100%;
+            background: #2c7da0;
+            border: none;
+            padding: 0.8rem;
+            border-radius: 1.5rem;
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-submit:hover {
+            background: #1f5e7a;
+            transform: translateY(-1px);
+        }
+        .btn-logout {
+            width: 100%;
+            background: #fee2e2;
+            border: 1px solid #fecaca;
+            padding: 0.8rem;
+            border-radius: 1.5rem;
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: #dc2626;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 1rem;
+        }
+        .btn-logout:hover {
+            background: #fecaca;
+        }
+
+        /* Message Toast */
+        .message {
+            position: fixed;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 0.7rem 1.5rem;
+            border-radius: 2rem;
+            font-size: 0.8rem;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            animation: slideUp 0.3s ease;
+        }
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateX(-50%) translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0);
+            }
+        }
+        .message.error {
+            background: #fee2e2;
+            color: #dc2626;
+            border-left: 4px solid #dc2626;
+        }
+        .message.success {
+            background: #d1fae5;
+            color: #059669;
+            border-left: 4px solid #059669;
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            margin-top: 1.5rem;
+            padding-top: 1rem;
+            border-top: 1px solid #e2e8f0;
+            font-size: 0.65rem;
+            color: #94a3b8;
+        }
+
+        /* Hidden Class */
+        .hidden {
+            display: none;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(8px);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background: white;
+            border-radius: 1.5rem;
+            width: 95%;
+            max-width: 1400px;
+            height: 88vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 1.5rem;
+            background: #1f3b4c;
+            color: white;
+        }
+        .modal-header h2 {
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .close-modal {
+            font-size: 1.8rem;
+            cursor: pointer;
+            transition: 0.2s;
+            line-height: 1;
+        }
+        .close-modal:hover {
+            color: #e74c3c;
+        }
+        .modal-body {
+            flex: 1;
+            overflow: auto;
+            padding: 1rem;
+            background: #f1f5f9;
+        }
+        .dashboard-tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid #e2e8f0;
+            background: #f1f5f9;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        .dashboard-tab {
+            background: white;
+            color: #1f3b4c;
+            border: 1px solid #e2e8f0;
+            padding: 0.5rem 1.2rem;
+            border-radius: 2rem;
+            cursor: pointer;
+            transition: 0.2s;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+        .dashboard-tab:hover {
+            background: #e2e8f0;
+        }
+        .dashboard-tab.active {
+            background: #2c7da0;
+            border-color: #2c7da0;
+            color: white;
+        }
+        .dashboard-iframe-container {
+            position: relative;
+            width: 100%;
+            height: calc(88vh - 120px);
+            background: white;
+            border-radius: 0.75rem;
+            overflow: hidden;
+        }
+        .dashboard-iframe-container.single {
+            height: calc(88vh - 100px);
+        }
+        .dashboard-iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+        .iframe-loading {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255,255,255,0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 0.8rem;
+            color: #2c7da0;
+            font-size: 0.9rem;
+            z-index: 5;
+        }
+        .modal-footer {
+            padding: 0.8rem 1.5rem;
+            background: #f8fafc;
+            border-top: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: flex-end;
+        }
+        .btn-close-modal {
+            background: #e74c3c;
+            border: none;
+            padding: 0.5rem 1.5rem;
+            border-radius: 2rem;
+            cursor: pointer;
+            font-weight: 600;
+            color: white;
+            transition: 0.2s;
+        }
+        .btn-close-modal:hover {
+            background: #c0392b;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            body { padding: 1rem; }
+            .card-header { padding: 1rem 1.2rem; }
+            .card-header h1 { font-size: 1.3rem; }
+            .card-content { padding: 1rem 1.2rem; }
+            .access-card { flex-direction: column; text-align: center; }
+            .access-info { justify-content: center; }
+            
+            /* Table responsive */
+            .table-wrapper {
+                border: none;
+            }
+            table, thead, tbody, th, td, tr {
+                display: block;
+            }
+            th {
+                display: none;
+            }
+            tr {
+                margin-bottom: 1rem;
+                border: 1px solid #e2e8f0;
+                border-radius: 0.75rem;
+                background: white;
+            }
+            td {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 0.75rem 1rem;
+                border-bottom: 1px solid #e2e8f0;
+                gap: 1rem;
+            }
+            td:last-child {
+                border-bottom: none;
+            }
+            td:before {
+                content: attr(data-label);
+                font-weight: 600;
+                color: #1f3b4c;
+                min-width: 100px;
+            }
+            .product-name-cell {
+                flex: 1;
+                justify-content: flex-end;
+            }
+            .dashboard-tab { font-size: 0.7rem; padding: 0.4rem 0.8rem; }
+            .modal-content { width: 98%; height: 94vh; }
+            .dashboard-iframe-container { height: calc(94vh - 120px); }
+        }
+    </style>
+    
     <script type="module">
         // ======================= KONFIGURASI FIREBASE =======================
         const firebaseConfig = {
@@ -141,7 +818,7 @@
                 
                 productsTableBody.innerHTML = '';
                 if (products.length === 0) {
-                    productsTableBody.innerHTML = '<tr><td colspan="4" style="text-align: center;">Belum ada produk. Tambahkan menggunakan form di bawah.</td></tr>';
+                    productsTableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 2rem; color: #64748b;">Belum ada produk. Tambahkan menggunakan form di bawah.</td></tr>';
                     updateDashboardButton();
                 } else {
                     // Kumpulkan semua data produk terlebih dahulu
@@ -185,7 +862,7 @@
                                         <button class="cancel-name-btn">Batal</button>
                                     </div>
                                 </div>
-                            </td>
+                             </td>
                             <td data-label="Kode Produk">${escapeHtml(product.code)}</td>
                             <td data-label="Status">${product.hasLink ? '<span class="status-active"><i class="fas fa-link"></i> Dashboard Tersedia</span>' : '<span class="status-pending"><i class="fas fa-clock"></i> Menunggu Link</span>'}</td>
                             <td data-label="Hapus">
@@ -490,629 +1167,122 @@
             }
         });
     </script>
-
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Segoe UI', system-ui, sans-serif;
-        }
-
-        body {
-            background-image: url('background_link.png');
-            background-size: cover;
-            background-position: center;
-            background-attachment: fixed;
-            background-repeat: no-repeat;
-            position: relative;
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 1.5rem;
-        }
-
-        body::before {
-            content: '';
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.55);
-            backdrop-filter: blur(2px);
-            z-index: -1;
-        }
-
-        .dashboard-card {
-            background: rgba(255, 255, 255, 0.96);
-            border-radius: 2rem;
-            box-shadow: 0 20px 35px -12px rgba(0, 0, 0, 0.2);
-            width: 100%;
-            max-width: 1100px;
-            padding: 2rem;
-            backdrop-filter: blur(4px);
-        }
-
-        h1 {
-            font-size: 1.8rem;
-            font-weight: 700;
-            background: linear-gradient(135deg, #1A2A4F, #2C3E66);
-            background-clip: text;
-            -webkit-background-clip: text;
-            color: transparent;
-            margin-bottom: 0.5rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .sub {
-            color: #2c3e66cc;
-            margin-bottom: 1.8rem;
-            border-left: 3px solid #2c7da0;
-            padding-left: 1rem;
-        }
-
-        .info-card {
-            background: #eef2fc;
-            border-radius: 1.5rem;
-            padding: 1rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .info-row {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 0.8rem;
-            flex-wrap: wrap;
-        }
-
-        .info-label {
-            font-weight: 600;
-            color: #1f3b4c;
-        }
-
-        .info-value {
-            color: #2c7da0;
-            font-weight: 500;
-            word-break: break-all;
-        }
-
-        /* Dashboard Access Card - Tombol Utama */
-        .dashboard-access-card {
-            background: linear-gradient(135deg, #1A2A4F, #2C3E66);
-            border-radius: 1.5rem;
-            padding: 1.2rem 1.5rem;
-            margin-bottom: 1.5rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 1rem;
-            color: white;
-        }
-
-        .dashboard-access-info {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            flex-wrap: wrap;
-        }
-
-        .dashboard-access-info h3 {
-            font-size: 1.1rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .dashboard-badge {
-            background: rgba(255,255,255,0.2);
-            border-radius: 2rem;
-            padding: 0.3rem 1rem;
-            font-size: 0.9rem;
-            font-weight: 600;
-        }
-
-        .dashboard-status {
-            font-size: 0.85rem;
-            opacity: 0.9;
-        }
-
-        .btn-open-all {
-            background: #27ae60;
-            color: white;
-            border: none;
-            padding: 0.8rem 1.8rem;
-            border-radius: 2rem;
-            font-weight: 700;
-            font-size: 1rem;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.8rem;
-            transition: 0.2s;
-        }
-
-        .btn-open-all:hover:not(:disabled) {
-            background: #1e8e4a;
-            transform: scale(0.98);
-        }
-
-        .btn-open-all:disabled {
-            background: #7f8c8d;
-            cursor: not-allowed;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 1rem;
-            margin-bottom: 1.5rem;
-        }
-
-        th, td {
-            text-align: left;
-            padding: 0.75rem;
-            border-bottom: 1px solid #e2e8f0;
-            vertical-align: middle;
-        }
-
-        th {
-            background: #eef2fc;
-            color: #1f3b4c;
-        }
-
-        button {
-            transition: 0.2s;
-        }
-
-        .delete-product-btn {
-            background: #c0392b;
-            padding: 0.3rem 0.8rem;
-            border-radius: 1.5rem;
-            border: none;
-            cursor: pointer;
-            color: white;
-            font-weight: 600;
-            font-size: 0.8rem;
-        }
-
-        .delete-product-btn:hover {
-            background: #a82315;
-            transform: scale(0.96);
-        }
-
-        .status-active {
-            color: #27ae60;
-            font-weight: 600;
-        }
-
-        .status-pending {
-            color: #e67e22;
-            font-weight: 600;
-        }
-
-        .form-group {
-            margin: 1.2rem 0;
-        }
-
-        input {
-            width: 100%;
-            padding: 0.8rem 1rem;
-            border: 1px solid #cbd5e1;
-            border-radius: 2rem;
-            font-size: 1rem;
-            background: white;
-        }
-
-        input:focus {
-            outline: none;
-            border-color: #2c7da0;
-            box-shadow: 0 0 0 3px rgba(44,125,160,0.2);
-        }
-
-        .message {
-            margin-top: 1rem;
-            padding: 0.7rem;
-            border-radius: 1rem;
-            text-align: center;
-            font-size: 0.85rem;
-        }
-
-        .error {
-            background: #ffe6e6;
-            color: #c0392b;
-            border-left: 4px solid #c0392b;
-        }
-
-        .success {
-            background: #e0f2e9;
-            color: #1e6f3f;
-            border-left: 4px solid #1e6f3f;
-        }
-
-        .logout-btn {
-            background: #c0392b;
-            margin-top: 1rem;
-            width: 100%;
-            padding: 0.8rem;
-            border-radius: 2rem;
-            border: none;
-            color: white;
-            font-weight: bold;
-            cursor: pointer;
-        }
-
-        #loading {
-            text-align: center;
-            font-size: 1.2rem;
-            color: #2c3e66;
-        }
-
-        footer {
-            text-align: center;
-            margin-top: 2rem;
-            font-size: 0.7rem;
-            color: #4a627a;
-        }
-
-        .product-name-cell {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            flex-wrap: wrap;
-        }
-        .product-name-text {
-            flex: 1;
-            font-weight: 500;
-        }
-        .edit-name-btn {
-            background: #f39c12;
-            padding: 0.2rem 0.6rem;
-            border-radius: 1.5rem;
-            border: none;
-            cursor: pointer;
-            color: white;
-            font-size: 0.8rem;
-        }
-        .edit-name-form {
-            display: flex;
-            gap: 0.5rem;
-            flex-wrap: wrap;
-            align-items: center;
-            width: 100%;
-        }
-        .edit-name-input {
-            flex: 2;
-            min-width: 120px;
-            padding: 0.4rem 0.8rem;
-            border-radius: 2rem;
-            border: 1px solid #cbd5e1;
-        }
-        .edit-buttons {
-            display: flex;
-            gap: 0.3rem;
-        }
-        .edit-buttons button {
-            padding: 0.3rem 0.8rem;
-            font-size: 0.8rem;
-            border-radius: 1.5rem;
-            border: none;
-            cursor: pointer;
-            color: white;
-        }
-        .save-name-btn {
-            background: #27ae60;
-        }
-        .cancel-name-btn {
-            background: #7f8c8d;
-        }
-        .hidden {
-            display: none;
-        }
-        
-        /* Modal Styles */
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.85);
-            z-index: 2000;
-            justify-content: center;
-            align-items: center;
-            backdrop-filter: blur(8px);
-        }
-        
-        .modal-content {
-            background: #1a2a4f;
-            border-radius: 1.5rem;
-            width: 95%;
-            max-width: 1400px;
-            height: 90vh;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-        }
-        
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 1rem 1.5rem;
-            background: linear-gradient(135deg, #1A2A4F, #2C3E66);
-            color: white;
-            border-bottom: 1px solid rgba(255,255,255,0.2);
-        }
-        
-        .modal-header h2 {
-            font-size: 1.3rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        
-        .close-modal {
-            font-size: 2rem;
-            cursor: pointer;
-            transition: 0.2s;
-            line-height: 1;
-        }
-        
-        .close-modal:hover {
-            color: #e74c3c;
-            transform: scale(1.1);
-        }
-        
-        .modal-body {
-            flex: 1;
-            overflow: auto;
-            padding: 1rem;
-            background: #f0f4f8;
-        }
-        
-        .dashboard-tabs {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.5rem;
-            margin-bottom: 1rem;
-            padding-bottom: 0.5rem;
-            border-bottom: 2px solid #cbd5e1;
-            background: #f0f4f8;
-            position: sticky;
-            top: 0;
-            z-index: 10;
-        }
-        
-        .dashboard-tab {
-            background: #e2e8f0;
-            color: #1f3b4c;
-            border: none;
-            padding: 0.6rem 1.2rem;
-            border-radius: 2rem;
-            cursor: pointer;
-            transition: 0.2s;
-            font-size: 0.85rem;
-            font-weight: 600;
-        }
-        
-        .dashboard-tab:hover {
-            background: #cbd5e1;
-            transform: none;
-        }
-        
-        .dashboard-tab.active {
-            background: #2c7da0;
-            color: white;
-        }
-        
-        .dashboard-iframe-container {
-            position: relative;
-            width: 100%;
-            height: calc(90vh - 130px);
-            background: white;
-            border-radius: 1rem;
-            overflow: hidden;
-        }
-        
-        .dashboard-iframe-container.single {
-            height: calc(90vh - 100px);
-        }
-        
-        .dashboard-iframe {
-            width: 100%;
-            height: 100%;
-            border: none;
-            border-radius: 0.5rem;
-            background: white;
-        }
-        
-        .iframe-loading {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(255, 255, 255, 0.95);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 1.1rem;
-            color: #2c7da0;
-            gap: 0.8rem;
-            z-index: 5;
-            flex-direction: column;
-        }
-        
-        .modal-footer {
-            padding: 0.8rem 1.5rem;
-            background: #1a2a4f;
-            border-top: 1px solid rgba(255,255,255,0.2);
-            display: flex;
-            justify-content: flex-end;
-        }
-        
-        .btn-close-modal {
-            background: #e74c3c;
-            color: white;
-            border: none;
-            padding: 0.5rem 1.5rem;
-            border-radius: 2rem;
-            cursor: pointer;
-            font-weight: 600;
-        }
-        
-        .btn-close-modal:hover {
-            background: #c0392b;
-            transform: scale(0.98);
-        }
-
-        @media (max-width: 600px) {
-            .dashboard-card {
-                padding: 1.5rem;
-            }
-            .info-row {
-                flex-direction: column;
-                gap: 0.3rem;
-            }
-            th, td {
-                display: block;
-            }
-            th {
-                display: none;
-            }
-            td {
-                border-bottom: none;
-                position: relative;
-                padding-left: 50%;
-            }
-            td:before {
-                content: attr(data-label);
-                position: absolute;
-                left: 0.75rem;
-                font-weight: bold;
-            }
-            .product-name-cell {
-                flex-direction: column;
-                align-items: flex-start;
-            }
-            .edit-name-form {
-                flex-direction: column;
-                align-items: stretch;
-            }
-            .edit-buttons {
-                justify-content: flex-start;
-            }
-            .dashboard-access-card {
-                flex-direction: column;
-                text-align: center;
-            }
-            .dashboard-access-info {
-                justify-content: center;
-            }
-            .dashboard-tab {
-                font-size: 0.7rem;
-                padding: 0.4rem 0.8rem;
-            }
-            .modal-content {
-                width: 98%;
-                height: 95vh;
-            }
-            .dashboard-iframe-container {
-                height: calc(95vh - 120px);
-            }
-        }
-    </style>
 </head>
 <body>
-<div id="loading">Memuat dashboard...</div>
-<div id="content" style="display: none;">
-    <div class="dashboard-card">
-        <h1><i class="fas fa-chalkboard-user"></i> Dashboard User</h1>
-        <div class="sub">Produk yang dipesan & akses dashboard</div>
-
-        <div class="info-card">
-            <div class="info-row">
-                <span class="info-label">Email Anda:</span>
-                <span id="userEmail" class="info-value">-</span>
-            </div>
-        </div>
-
-        <!-- TOMBOL AKSES DASHBOARD - SATU TOMBOL UTAMA -->
-        <div class="dashboard-access-card">
-            <div class="dashboard-access-info">
-                <h3><i class="fas fa-tachometer-alt"></i> Akses Semua Dashboard</h3>
-                <div class="dashboard-badge">
-                    <span id="dashboardCount">0</span> Dashboard Tersedia
-                </div>
-                <div class="dashboard-status" id="dashboardStatus">
-                    <i class="fas fa-spinner fa-pulse"></i> Memuat...
-                </div>
-            </div>
-            <button id="openAllDashboardBtn" class="btn-open-all" disabled>
-                <i class="fas fa-chalkboard"></i> Buka Semua Dashboard
-            </button>
-        </div>
-
-        <h3><i class="fas fa-folder-open"></i> Daftar Produk Saya</h3>
-        <div style="margin-bottom: 0.8rem; font-size: 0.8rem; color: #2c7da0;">
-            <i class="fas fa-info-circle"></i> Produk dengan status "Dashboard Tersedia" akan muncul saat tombol "Buka Semua Dashboard" diklik
-        </div>
-        <table>
-            <thead>
-                <tr>
-                    <th>Nama Produk</th>
-                    <th>Kode Produk</th>
-                    <th>Status</th>
-                    <th>Hapus</th>
-                </tr>
-            </thead>
-            <tbody id="productsTableBody">
-                <tr><td colspan="4">Memuat...</td></tr>
-            </tbody>
-        </table>
-
-        <hr style="margin: 1.5rem 0; border-color: #dce5f0;">
-
-        <h3><i class="fas fa-plus-circle"></i> Tambah Produk Baru</h3>
-        <form id="addProductForm">
-            <div class="form-group">
-                <input type="text" id="newProductCode" placeholder="Masukkan kode produk yang ingin dipesan" required>
-            </div>
-            <button type="submit" style="width: 100%;">Tambah Produk</button>
-        </form>
-
-        <div id="message" class="message"></div>
-        <button id="logoutBtn" class="logout-btn">Logout</button>
-        <footer>
-            <i class="fas fa-info-circle"></i> Hanya kode produk yang sudah didaftarkan admin yang dapat ditambahkan. Anda dapat mengedit nama produk atau menghapus produk kapan saja.
-        </footer>
-    </div>
-</div>
-
-<!-- Modal untuk menampilkan semua dashboard -->
-<div id="dashboardModal" class="modal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h2><i class="fas fa-tachometer-alt"></i> <span id="modalTitle">Dashboard</span></h2>
-            <span class="close-modal">&times;</span>
-        </div>
-        <div class="modal-body" id="dashboardsContainer">
-            <!-- Dashboard iframes akan dimuat di sini -->
-        </div>
-        <div class="modal-footer">
-            <button id="closeModalBtn" class="btn-close-modal">Tutup</button>
+    <div id="loading" class="loading-screen">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <div class="loading-text">Memuat dashboard...</div>
         </div>
     </div>
-</div>
 
-<!-- Font Awesome -->
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <div id="content" style="display: none;">
+        <div class="container">
+            <div class="dashboard-card">
+                <div class="card-header">
+                    <h1>
+                        <i class="fas fa-chalkboard-user"></i> 
+                        Dashboard User
+                    </h1>
+                    <div class="sub">
+                        <i class="fas fa-layer-group"></i> Kelola produk dan akses dashboard Anda
+                    </div>
+                </div>
+                
+                <div class="card-content">
+                    <div class="info-card">
+                        <div class="info-row">
+                            <span class="info-label"><i class="fas fa-envelope"></i> Email Anda</span>
+                            <span id="userEmail" class="info-value">-</span>
+                        </div>
+                    </div>
+
+                    <!-- TOMBOL AKSES DASHBOARD - SATU TOMBOL UTAMA -->
+                    <div class="access-card">
+                        <div class="access-info">
+                            <div class="access-title">
+                                <i class="fas fa-tachometer-alt"></i>
+                                <span>Akses Semua Dashboard</span>
+                            </div>
+                            <div class="badge">
+                                <span id="dashboardCount">0</span> Dashboard Tersedia
+                            </div>
+                            <div class="status-text" id="dashboardStatus">
+                                <i class="fas fa-spinner fa-pulse"></i> Memuat...
+                            </div>
+                        </div>
+                        <button id="openAllDashboardBtn" class="btn-primary" disabled>
+                            <i class="fas fa-chalkboard"></i> Buka Semua Dashboard
+                        </button>
+                    </div>
+
+                    <div class="section-title">
+                        <i class="fas fa-folder-open"></i>
+                        <span>Daftar Produk Saya</span>
+                    </div>
+                    <div class="info-note">
+                        <i class="fas fa-info-circle"></i> Produk dengan status "Dashboard Tersedia" akan muncul saat tombol "Buka Semua Dashboard" diklik
+                    </div>
+                    
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th style="width: 40%">Nama Produk</th>
+                                    <th style="width: 25%">Kode Produk</th>
+                                    <th style="width: 20%">Status</th>
+                                    <th style="width: 15%">Hapus</th>
+                                </tr>
+                            </thead>
+                            <tbody id="productsTableBody">
+                                <tr><td colspan="4" style="text-align: center; padding: 2rem;">Memuat...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <hr style="margin: 1.5rem 0; border-color: #e2e8f0;">
+
+                    <div class="section-title">
+                        <i class="fas fa-plus-circle"></i>
+                        <span>Tambah Produk Baru</span>
+                    </div>
+                    <form id="addProductForm">
+                        <div class="form-group">
+                            <input type="text" id="newProductCode" placeholder="Masukkan kode produk yang ingin dipesan" required>
+                        </div>
+                        <button type="submit" class="btn-submit">
+                            <i class="fas fa-plus"></i> Tambah Produk
+                        </button>
+                    </form>
+
+                    <button id="logoutBtn" class="btn-logout">
+                        <i class="fas fa-sign-out-alt"></i> Logout
+                    </button>
+                    
+                    <div class="footer">
+                        <i class="fas fa-info-circle"></i> Hanya kode produk yang sudah didaftarkan admin yang dapat ditambahkan. Anda dapat mengedit nama produk atau menghapus produk kapan saja.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="message" class="message"></div>
+
+    <!-- Modal untuk menampilkan semua dashboard -->
+    <div id="dashboardModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-tachometer-alt"></i> <span id="modalTitle">Dashboard</span></h2>
+                <span class="close-modal">&times;</span>
+            </div>
+            <div class="modal-body" id="dashboardsContainer">
+                <!-- Dashboard iframes akan dimuat di sini -->
+            </div>
+            <div class="modal-footer">
+                <button id="closeModalBtn" class="btn-close-modal">Tutup</button>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
