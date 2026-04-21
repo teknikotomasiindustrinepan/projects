@@ -37,6 +37,13 @@
         const newProductCodeInput = document.getElementById('newProductCode');
         const messageDiv = document.getElementById('message');
         const logoutBtn = document.getElementById('logoutBtn');
+        
+        // Modal elements
+        const modal = document.getElementById('dashboardModal');
+        const modalTitle = document.getElementById('modalTitle');
+        const dashboardsContainer = document.getElementById('dashboardsContainer');
+        const closeModal = document.querySelector('.close-modal');
+        const closeModalBtn = document.getElementById('closeModalBtn');
 
         // Helper: tampilkan pesan
         function showMessage(text, isError = true) {
@@ -59,18 +66,16 @@
             });
         }
 
-        // Hapus produk dari user (tanpa menghapus produk global)
+        // Hapus produk dari user
         async function removeProductFromUser(userId, code) {
             const userRef = doc(db, "users", userId);
             const userSnap = await getDoc(userRef);
             if (!userSnap.exists()) return;
             
-            // Hapus dari array projects (field projects menyimpan kode produk)
             await updateDoc(userRef, {
                 projects: arrayRemove(code)
             });
             
-            // Hapus custom name jika ada
             const userData = userSnap.data();
             const customNames = userData.projectCustomNames || {};
             if (customNames[code]) {
@@ -107,6 +112,8 @@
                 if (products.length === 0) {
                     productsTableBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Belum ada produk. Tambahkan menggunakan form di bawah.</td></tr>';
                 } else {
+                    // Kumpulkan semua data produk terlebih dahulu
+                    const productsData = [];
                     for (const code of products) {
                         const productDocRef = doc(db, "products", code);
                         const productSnap = await getDoc(productDocRef);
@@ -122,43 +129,76 @@
                         const hasLink = link && link.trim() !== '';
                         const displayName = customNames[code] ? customNames[code] : defaultName;
                         
+                        productsData.push({
+                            code: code,
+                            displayName: displayName,
+                            link: link,
+                            hasLink: hasLink
+                        });
+                    }
+                    
+                    // Urutkan berdasarkan nama
+                    productsData.sort((a, b) => a.displayName.localeCompare(b.displayName));
+                    
+                    for (const product of productsData) {
                         const row = document.createElement('tr');
-                        row.setAttribute('data-code', code);
+                        row.setAttribute('data-code', product.code);
                         row.innerHTML = `
                             <td data-label="Nama Produk" class="product-name-cell">
-                                <span class="product-name-text">${escapeHtml(displayName)}</span>
-                                <button class="edit-name-btn" data-code="${escapeHtml(code)}" title="Edit nama produk">✏️</button>
+                                <span class="product-name-text">${escapeHtml(product.displayName)}</span>
+                                <button class="edit-name-btn" data-code="${escapeHtml(product.code)}" title="Edit nama produk">✏️</button>
                                 <div class="edit-name-form hidden">
-                                    <input type="text" class="edit-name-input" value="${escapeHtml(displayName)}">
+                                    <input type="text" class="edit-name-input" value="${escapeHtml(product.displayName)}">
                                     <div class="edit-buttons">
                                         <button class="save-name-btn">Simpan</button>
                                         <button class="cancel-name-btn">Batal</button>
                                     </div>
                                 </div>
                             </td>
-                            <td data-label="Kode Produk">${escapeHtml(code)}</td>
+                            <td data-label="Kode Produk">${escapeHtml(product.code)}</td>
                             <td data-label="Akses Dashboard">
-                                <button class="open-product-btn" data-link="${hasLink ? escapeHtml(link) : ''}" ${!hasLink ? 'disabled' : ''}>
-                                    <i class="fas fa-tachometer-alt"></i> Dashboard
+                                <button class="open-product-btn" data-link="${product.hasLink ? escapeHtml(product.link) : ''}" data-name="${escapeHtml(product.displayName)}" ${!product.hasLink ? 'disabled' : ''}>
+                                    <i class="fas fa-tachometer-alt"></i> Buka Dashboard
                                 </button>
                             </td>
-                            <td data-label="Status">${hasLink ? '<span class="status-active">Aktif</span>' : '<span class="status-pending">Menunggu Link</span>'}</td>
+                            <td data-label="Status">${product.hasLink ? '<span class="status-active">Aktif</span>' : '<span class="status-pending">Menunggu Link</span>'}</td>
                             <td data-label="Hapus">
-                                <button class="delete-product-btn" data-code="${escapeHtml(code)}" title="Hapus produk">✖</button>
+                                <button class="delete-product-btn" data-code="${escapeHtml(product.code)}" title="Hapus produk">✖</button>
                             </td>
                         `;
                         productsTableBody.appendChild(row);
                     }
 
-                    // Event listener untuk tombol buka dashboard
+                    // Event listener untuk tombol buka dashboard (tampilkan semua dalam modal)
                     document.querySelectorAll('.open-product-btn').forEach(btn => {
-                        btn.addEventListener('click', () => {
+                        btn.addEventListener('click', async () => {
                             const link = btn.getAttribute('data-link');
-                            if (link) {
-                                window.location.href = link;
-                            } else {
+                            const productName = btn.getAttribute('data-name');
+                            
+                            if (!link) {
                                 showMessage('Link belum tersedia oleh admin', true);
+                                return;
                             }
+                            
+                            // Kumpulkan semua link dari semua produk user yang memiliki link
+                            const allLinks = [];
+                            for (const product of productsData) {
+                                if (product.hasLink && product.link) {
+                                    allLinks.push({
+                                        name: product.displayName,
+                                        url: product.link,
+                                        code: product.code
+                                    });
+                                }
+                            }
+                            
+                            if (allLinks.length === 0) {
+                                showMessage('Tidak ada dashboard yang tersedia', true);
+                                return;
+                            }
+                            
+                            // Tampilkan modal dengan semua dashboard
+                            showAllDashboards(allLinks);
                         });
                     });
 
@@ -224,6 +264,7 @@
                                 editForm.classList.add('hidden');
                                 
                                 showMessage(`Nama produk berhasil diubah menjadi "${newName}"`, false);
+                                await loadUserDashboard(user);
                             } catch (error) {
                                 showMessage(`Gagal mengubah nama: ${error.message}`, true);
                             }
@@ -248,6 +289,109 @@
                 showMessage(`Gagal memuat data: ${error.message}`, true);
                 console.error(error);
             }
+        }
+        
+        // Tampilkan semua dashboard dalam modal
+        function showAllDashboards(dashboards) {
+            // Kosongkan container
+            dashboardsContainer.innerHTML = '';
+            
+            // Set judul modal
+            modalTitle.textContent = `Dashboard (${dashboards.length} Produk)`;
+            
+            // Buat tab navigasi jika lebih dari 1 dashboard
+            if (dashboards.length > 1) {
+                const tabsContainer = document.createElement('div');
+                tabsContainer.className = 'dashboard-tabs';
+                
+                const tabsContent = document.createElement('div');
+                tabsContent.className = 'dashboard-tabs-content';
+                
+                dashboards.forEach((dashboard, index) => {
+                    const tab = document.createElement('button');
+                    tab.className = `dashboard-tab ${index === 0 ? 'active' : ''}`;
+                    tab.setAttribute('data-tab-index', index);
+                    tab.innerHTML = `<i class="fas fa-chart-line"></i> ${escapeHtml(dashboard.name)}`;
+                    tab.addEventListener('click', () => {
+                        // Aktifkan tab yang diklik
+                        document.querySelectorAll('.dashboard-tab').forEach(t => t.classList.remove('active'));
+                        tab.classList.add('active');
+                        // Tampilkan iframe yang sesuai
+                        document.querySelectorAll('.dashboard-iframe-container').forEach((container, i) => {
+                            container.style.display = i === index ? 'block' : 'none';
+                        });
+                    });
+                    tabsContainer.appendChild(tab);
+                    
+                    // Buat container iframe
+                    const iframeContainer = document.createElement('div');
+                    iframeContainer.className = 'dashboard-iframe-container';
+                    iframeContainer.style.display = index === 0 ? 'block' : 'none';
+                    
+                    const iframe = document.createElement('iframe');
+                    iframe.src = dashboard.url + (dashboard.url.includes('?') ? '&' : '?') + 'embedded=true';
+                    iframe.title = dashboard.name;
+                    iframe.className = 'dashboard-iframe';
+                    iframe.sandbox = 'allow-same-origin allow-scripts allow-popups allow-forms allow-modals';
+                    
+                    // Loading indicator untuk setiap iframe
+                    const loadingOverlay = document.createElement('div');
+                    loadingOverlay.className = 'iframe-loading';
+                    loadingOverlay.innerHTML = '<i class="fas fa-spinner fa-pulse"></i> Memuat dashboard...';
+                    
+                    iframeContainer.appendChild(loadingOverlay);
+                    iframeContainer.appendChild(iframe);
+                    
+                    iframe.onload = () => {
+                        loadingOverlay.style.display = 'none';
+                    };
+                    
+                    tabsContent.appendChild(iframeContainer);
+                });
+                
+                dashboardsContainer.appendChild(tabsContainer);
+                dashboardsContainer.appendChild(tabsContent);
+            } else {
+                // Single dashboard - tampilkan langsung tanpa tab
+                const dashboard = dashboards[0];
+                const iframeContainer = document.createElement('div');
+                iframeContainer.className = 'dashboard-iframe-container single';
+                
+                const iframe = document.createElement('iframe');
+                iframe.src = dashboard.url + (dashboard.url.includes('?') ? '&' : '?') + 'embedded=true';
+                iframe.title = dashboard.name;
+                iframe.className = 'dashboard-iframe';
+                iframe.sandbox = 'allow-same-origin allow-scripts allow-popups allow-forms allow-modals';
+                
+                const loadingOverlay = document.createElement('div');
+                loadingOverlay.className = 'iframe-loading';
+                loadingOverlay.innerHTML = '<i class="fas fa-spinner fa-pulse"></i> Memuat dashboard...';
+                
+                iframeContainer.appendChild(loadingOverlay);
+                iframeContainer.appendChild(iframe);
+                
+                iframe.onload = () => {
+                    loadingOverlay.style.display = 'none';
+                };
+                
+                dashboardsContainer.appendChild(iframeContainer);
+            }
+            
+            // Tampilkan modal
+            modal.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+        }
+        
+        // Tutup modal
+        function closeModalHandler() {
+            modal.style.display = 'none';
+            document.body.style.overflow = '';
+            // Hentikan semua iframe
+            const iframes = dashboardsContainer.querySelectorAll('iframe');
+            iframes.forEach(iframe => {
+                iframe.src = 'about:blank';
+            });
+            dashboardsContainer.innerHTML = '';
         }
 
         // Tambah produk baru
@@ -316,6 +460,15 @@
                 showMessage('Anda belum login', true);
             }
         });
+        
+        // Modal event listeners
+        closeModal.addEventListener('click', closeModalHandler);
+        closeModalBtn.addEventListener('click', closeModalHandler);
+        window.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                closeModalHandler();
+            }
+        });
     </script>
 
     <style>
@@ -340,7 +493,6 @@
             padding: 1.5rem;
         }
 
-        /* Overlay transparan agar teks terbaca */
         body::before {
             content: '';
             position: fixed;
@@ -574,6 +726,163 @@
         .hidden {
             display: none;
         }
+        
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(8px);
+        }
+        
+        .modal-content {
+            background: #1a2a4f;
+            border-radius: 1.5rem;
+            width: 95%;
+            max-width: 1400px;
+            height: 90vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 1.5rem;
+            background: linear-gradient(135deg, #1A2A4F, #2C3E66);
+            color: white;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+        }
+        
+        .modal-header h2 {
+            font-size: 1.3rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .close-modal {
+            font-size: 2rem;
+            cursor: pointer;
+            transition: 0.2s;
+            line-height: 1;
+        }
+        
+        .close-modal:hover {
+            color: #e74c3c;
+            transform: scale(1.1);
+        }
+        
+        .modal-body {
+            flex: 1;
+            overflow: auto;
+            padding: 1rem;
+            background: #f0f4f8;
+        }
+        
+        .dashboard-tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid #cbd5e1;
+            background: #f0f4f8;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        
+        .dashboard-tab {
+            background: #e2e8f0;
+            color: #1f3b4c;
+            border: none;
+            padding: 0.6rem 1.2rem;
+            border-radius: 2rem;
+            cursor: pointer;
+            transition: 0.2s;
+            font-size: 0.85rem;
+        }
+        
+        .dashboard-tab:hover {
+            background: #cbd5e1;
+            transform: none;
+        }
+        
+        .dashboard-tab.active {
+            background: #2c7da0;
+            color: white;
+        }
+        
+        .dashboard-iframe-container {
+            position: relative;
+            width: 100%;
+            height: calc(90vh - 130px);
+            background: white;
+            border-radius: 1rem;
+            overflow: hidden;
+        }
+        
+        .dashboard-iframe-container.single {
+            height: calc(90vh - 100px);
+        }
+        
+        .dashboard-iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            border-radius: 0.5rem;
+            background: white;
+        }
+        
+        .iframe-loading {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.2rem;
+            color: #2c7da0;
+            gap: 0.8rem;
+            z-index: 5;
+        }
+        
+        .modal-footer {
+            padding: 0.8rem 1.5rem;
+            background: #1a2a4f;
+            border-top: 1px solid rgba(255,255,255,0.2);
+            display: flex;
+            justify-content: flex-end;
+        }
+        
+        .btn-close-modal {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 0.5rem 1.5rem;
+            border-radius: 2rem;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        
+        .btn-close-modal:hover {
+            background: #c0392b;
+            transform: scale(0.98);
+        }
 
         @media (max-width: 600px) {
             .dashboard-card {
@@ -611,6 +920,17 @@
             .edit-buttons {
                 justify-content: flex-start;
             }
+            .dashboard-tab {
+                font-size: 0.7rem;
+                padding: 0.4rem 0.8rem;
+            }
+            .modal-content {
+                width: 98%;
+                height: 95vh;
+            }
+            .dashboard-iframe-container {
+                height: calc(95vh - 120px);
+            }
         }
     </style>
 </head>
@@ -629,6 +949,9 @@
         </div>
 
         <h3><i class="fas fa-folder-open"></i> Daftar Produk Saya</h3>
+        <div style="margin-bottom: 0.8rem; font-size: 0.8rem; color: #2c7da0;">
+            <i class="fas fa-info-circle"></i> Klik tombol "Buka Dashboard" untuk melihat semua dashboard produk Anda sekaligus
+        </div>
         <table>
             <thead>
                 <tr>
@@ -659,6 +982,22 @@
         <footer>
             <i class="fas fa-info-circle"></i> Hanya kode produk yang sudah didaftarkan admin yang dapat ditambahkan. Anda dapat mengedit nama produk atau menghapus produk kapan saja.
         </footer>
+    </div>
+</div>
+
+<!-- Modal untuk menampilkan semua dashboard -->
+<div id="dashboardModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2><i class="fas fa-tachometer-alt"></i> <span id="modalTitle">Dashboard</span></h2>
+            <span class="close-modal">&times;</span>
+        </div>
+        <div class="modal-body" id="dashboardsContainer">
+            <!-- Dashboard iframes akan dimuat di sini -->
+        </div>
+        <div class="modal-footer">
+            <button id="closeModalBtn" class="btn-close-modal">Tutup</button>
+        </div>
     </div>
 </div>
 
