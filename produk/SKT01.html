@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>IoT Soil Monitor | Smart Pump Dashboard</title>
+  <!-- MQTT over WebSockets via CDN (HiveMQ Broker supports WS) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+    }
+
+    body {
+      background: linear-gradient(145deg, #e0eafc 0%, #cfdef3 100%);
+      min-height: 100vh;
+      padding: 24px 16px;
+    }
+
+    /* main container */
+    .dashboard {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    /* header */
+    .header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    .header h1 {
+      font-size: 2rem;
+      background: linear-gradient(135deg, #1a4d2c, #2e7d32);
+      background-clip: text;
+      -webkit-background-clip: text;
+      color: transparent;
+      text-shadow: 2px 2px 8px rgba(0,0,0,0.05);
+      letter-spacing: -0.5px;
+    }
+
+    .header p {
+      color: #2c3e4e;
+      font-weight: 500;
+      margin-top: 8px;
+      font-size: 1rem;
+    }
+
+    .badge {
+      display: inline-block;
+      background: #1e2a3a;
+      color: #cdddee;
+      border-radius: 40px;
+      padding: 5px 14px;
+      font-size: 0.8rem;
+      margin-top: 10px;
+      font-family: monospace;
+    }
+
+    /* card grid */
+    .grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 24px;
+      justify-content: center;
+      margin-bottom: 40px;
+    }
+
+    .card {
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(2px);
+      border-radius: 48px;
+      box-shadow: 0 20px 35px -12px rgba(0, 0, 0, 0.2);
+      padding: 28px 24px;
+      flex: 1;
+      min-width: 260px;
+      transition: transform 0.2s ease, box-shadow 0.2s;
+      border: 1px solid rgba(255,255,240,0.6);
+    }
+
+    .card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 28px 38px -14px rgba(0, 0, 0, 0.25);
+    }
+
+    .card-title {
+      font-size: 1.3rem;
+      font-weight: 600;
+      color: #1f3b4c;
+      border-left: 5px solid #2e7d32;
+      padding-left: 16px;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* sensor reading big */
+    .sensor-value {
+      font-size: 4rem;
+      font-weight: 800;
+      text-align: center;
+      font-family: 'Monaco', 'Courier New', monospace;
+      background: #f4f9ff;
+      border-radius: 60px;
+      padding: 20px 10px;
+      margin: 16px 0;
+      box-shadow: inset 0 1px 4px #0001, 0 4px 12px rgba(0,0,0,0.05);
+    }
+
+    .moisture-label {
+      text-align: center;
+      font-weight: 600;
+      color: #2c5a2e;
+      margin-bottom: 12px;
+      font-size: 1rem;
+    }
+
+    .moisture-status {
+      text-align: center;
+      padding: 8px 12px;
+      border-radius: 40px;
+      background: #eef2fa;
+      display: inline-block;
+      width: auto;
+      margin: 10px auto 0;
+      font-weight: bold;
+    }
+
+    /* pump card */
+    .pump-status {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      margin: 20px 0;
+    }
+
+    .pump-icon {
+      font-size: 5rem;
+      transition: all 0.2s;
+    }
+
+    .pump-text {
+      font-size: 1.6rem;
+      font-weight: bold;
+      margin-top: 12px;
+      padding: 8px 24px;
+      border-radius: 60px;
+      background: #eef2ff;
+    }
+
+    .active-pump {
+      color: #00796b;
+      text-shadow: 0 0 2px #b2dfdb;
+    }
+
+    .inactive-pump {
+      color: #8d6e63;
+    }
+
+    /* threshold section */
+    .threshold-panel {
+      background: #ffffffcc;
+      border-radius: 40px;
+      padding: 20px 24px;
+      margin: 20px 0 30px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      backdrop-filter: blur(4px);
+    }
+
+    .threshold-control {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .threshold-control label {
+      font-weight: 700;
+      color: #1e3c2c;
+    }
+
+    #thresholdValue {
+      font-weight: bold;
+      background: #2c3e2f;
+      color: white;
+      padding: 5px 12px;
+      border-radius: 40px;
+      font-family: monospace;
+      font-size: 1.2rem;
+    }
+
+    input[type="range"] {
+      width: 260px;
+      height: 6px;
+      -webkit-appearance: none;
+      background: #b0bec5;
+      border-radius: 5px;
+      outline: none;
+    }
+
+    input[type="range"]:focus {
+      outline: none;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 20px;
+      height: 20px;
+      background: #2e7d32;
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      border: none;
+    }
+
+    button {
+      background: #2c5e2d;
+      border: none;
+      padding: 10px 24px;
+      border-radius: 60px;
+      color: white;
+      font-weight: bold;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: 0.2s;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+
+    button:hover {
+      background: #1b4d1c;
+      transform: scale(0.97);
+    }
+
+    .connection-status {
+      background: #fff6e0;
+      border-radius: 60px;
+      padding: 12px 24px;
+      text-align: center;
+      margin-bottom: 28px;
+      font-weight: 500;
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .led {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      display: inline-block;
+      background-color: gray;
+      box-shadow: 0 0 4px currentColor;
+    }
+
+    .led-green {
+      background-color: #2ecc71;
+      box-shadow: 0 0 6px #2ecc71;
+    }
+
+    .led-red {
+      background-color: #e74c3c;
+      box-shadow: 0 0 6px #e74c3c;
+    }
+
+    footer {
+      text-align: center;
+      font-size: 0.75rem;
+      color: #4a627a;
+      margin-top: 40px;
+    }
+
+    hr {
+      margin: 10px 0;
+      border-color: #cbd5e1;
+    }
+  </style>
+</head>
+<body>
+<div class="dashboard">
+  <div class="header">
+    <h1>🌱 Smart Soil Irrigation Dashboard</h1>
+    <p>Real-time monitoring | Pump control logic | MQTT live data</p>
+    <div class="badge">ESP8266 + Moisture Sensor + Relay Pump</div>
+  </div>
+
+  <!-- MQTT connection panel -->
+  <div class="connection-status" id="mqttStatusPanel">
+    <span class="led" id="mqttLed"></span>
+    <span id="mqttStatusText">MQTT: Connecting...</span>
+    <span style="font-size:0.8rem;">📡 broker.hivemq.com</span>
+  </div>
+
+  <!-- main cards -->
+  <div class="grid">
+    <!-- soil moisture card -->
+    <div class="card">
+      <div class="card-title">
+        💧 Soil Moisture Sensor
+      </div>
+      <div class="sensor-value" id="moistureValue">---</div>
+      <div class="moisture-label">Raw ADC Value (0-1023)</div>
+      <div id="moistureInterpret" class="moisture-status">⏳ waiting for data...</div>
+      <div style="margin-top: 16px; font-size:0.8rem; text-align:center;">
+        🔽 Higher value = drier soil
+      </div>
+    </div>
+
+    <!-- pump / relay card -->
+    <div class="card">
+      <div class="card-title">
+        🚰 Pump / Relay Output
+      </div>
+      <div class="pump-status">
+        <div class="pump-icon" id="pumpIcon">⛲</div>
+        <div class="pump-text" id="pumpStateText">--</div>
+      </div>
+      <div style="background:#e9ecef; border-radius: 28px; padding: 12px; margin-top: 8px; text-align:center;">
+        <span style="font-size:0.85rem;">⚡ Logic: <strong>sensor ≥ threshold → PUMP ON (water)</strong><br>sensor < threshold → PUMP OFF (soil wet)</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Threshold config (local dashboard + MQTT publish simulation) 
+       but also reflects logic to show pump state based on last received moisture -->
+  <div class="threshold-panel">
+    <div style="font-weight: 700;">🎛️ Dryness threshold (ADC)</div>
+    <div class="threshold-control">
+      <label for="thresholdSlider">Threshold: </label>
+      <input type="range" id="thresholdSlider" min="300" max="900" value="700" step="5">
+      <span id="thresholdValue">700</span>
+      <button id="applyThresholdBtn">Apply locally</button>
+      <small style="margin-left:6px; opacity:0.7;">(visual pump state updates)</small>
+    </div>
+  </div>
+
+  <div style="background: #d9e6db55; border-radius: 28px; padding: 12px 20px; margin-bottom: 20px;">
+    <div style="display: flex; gap: 20px; justify-content: space-between; flex-wrap: wrap;">
+      <div><span>📋 MQTT Topic: </span><code style="background:#1e2a36; color:#cbd5e6; padding:4px 8px; border-radius:20px;">iot/soil/moisture</code></div>
+      <div><span>🔄 Last update: </span><strong id="lastUpdateTime">—</strong></div>
+    </div>
+  </div>
+  <footer>
+    💡 Dashboard terhubung via MQTT over WebSocket. Data sensor dikirim setiap 5 detik dari ESP8266. <br>
+    Status pompa ditentukan oleh perbandingan nilai sensor dengan threshold (reversed logic: relay LOW = ON ketika kering).
+  </footer>
+</div>
+
+<script>
+  // ========= CONFIGURATION ==========
+  const BROKER = "broker.hivemq.com";
+  const PORT = 8000;        // WebSocket port for HiveMQ public (8000)
+  const TOPIC_SENSOR = "iot/soil/moisture";
+  const CLIENT_ID = "dashboard_" + Math.random().toString(16).substr(2, 8);
+
+  // ========= GLOBALS ==========
+  let mqttClient;
+  let connectionStatus = false;
+  let lastMoistureValue = null;       // store last ADC value from MQTT
+  let currentThreshold = 700;         // default threshold (matching ESP code)
+  let pumpState = false;              // false = OFF (relay HIGH), true = ON (LOW / pumping)
+
+  // DOM elements
+  const moistureSpan = document.getElementById("moistureValue");
+  const moistureInterpret = document.getElementById("moistureInterpret");
+  const pumpStateText = document.getElementById("pumpStateText");
+  const pumpIcon = document.getElementById("pumpIcon");
+  const thresholdSlider = document.getElementById("thresholdSlider");
+  const thresholdValueSpan = document.getElementById("thresholdValue");
+  const applyBtn = document.getElementById("applyThresholdBtn");
+  const lastUpdateSpan = document.getElementById("lastUpdateTime");
+  const mqttStatusText = document.getElementById("mqttStatusText");
+  const mqttLed = document.getElementById("mqttLed");
+
+  // Helper: update UI based on stored moisture + current threshold
+  function updatePumpAndUI() {
+    if (lastMoistureValue === null) {
+      // no data yet, show placeholder
+      pumpStateText.innerText = "WAITING";
+      pumpIcon.innerHTML = "⏳";
+      pumpIcon.style.opacity = "0.6";
+      return;
+    }
+
+    // Determine pump state according to logic: if sensorValue >= threshold => pump ON (relay LOW)
+    const shouldPumpOn = (lastMoistureValue >= currentThreshold);
+    pumpState = shouldPumpOn;
+
+    // update text and icon
+    if (pumpState) {
+      pumpStateText.innerText = "PUMP ACTIVE 💦";
+      pumpStateText.style.background = "#c8e6e0";
+      pumpStateText.style.color = "#004d40";
+      pumpIcon.innerHTML = "💧🚿💧";
+      pumpIcon.style.opacity = "1";
+    } else {
+      pumpStateText.innerText = "PUMP OFF 🟢";
+      pumpStateText.style.background = "#f5e6d3";
+      pumpStateText.style.color = "#8b5a2b";
+      pumpIcon.innerHTML = "⛲🚫";
+      pumpIcon.style.opacity = "0.8";
+    }
+
+    // update moisture interpretation text
+    if (lastMoistureValue >= currentThreshold) {
+      moistureInterpret.innerHTML = `🌵 KERING — pompa aktif (menyiram) | Nilai: ${lastMoistureValue} ≥ ${currentThreshold}`;
+      moistureInterpret.style.background = "#ffecb3";
+      moistureInterpret.style.color = "#b26a00";
+    } else {
+      moistureInterpret.innerHTML = `💧 LEMBAP / BASAH — pompa mati | Nilai: ${lastMoistureValue} < ${currentThreshold}`;
+      moistureInterpret.style.background = "#d4e0f0";
+      moistureInterpret.style.color = "#1f5e3a";
+    }
+  }
+
+  // update moisture display on dashboard
+  function updateMoistureDisplay(value) {
+    if (value === undefined || value === null) return;
+    moistureSpan.innerText = value;
+    // set color based on dryness
+    if (value >= currentThreshold) {
+      moistureSpan.style.background = "#ffe0b5";
+      moistureSpan.style.color = "#c4450c";
+    } else {
+      moistureSpan.style.background = "#c8e6df";
+      moistureSpan.style.color = "#1e6b3b";
+    }
+  }
+
+  // called when new MQTT message arrives
+  function onMessageReceived(topic, payload) {
+    if (topic === TOPIC_SENSOR) {
+      const str = payload.toString();
+      const sensorValue = parseInt(str, 10);
+      if (!isNaN(sensorValue)) {
+        lastMoistureValue = sensorValue;
+        updateMoistureDisplay(sensorValue);
+        // update pump decision based on new sensor and current threshold
+        updatePumpAndUI();
+        // set last update timestamp
+        const now = new Date();
+        lastUpdateSpan.innerText = now.toLocaleTimeString() + " | " + sensorValue;
+      } else {
+        console.warn("Invalid payload:", str);
+        moistureInterpret.innerText = "⚠️ Format data salah";
+      }
+    }
+  }
+
+  // MQTT connection setup
+  function initMqtt() {
+    // Use WebSocket connection to HiveMQ public broker
+    mqttClient = new Paho.MQTT.Client(BROKER, PORT, CLIENT_ID);
+    
+    // set callback handlers
+    mqttClient.onConnectionLost = onConnectionLost;
+    mqttClient.onMessageArrived = onMessageArrived;
+
+    const connectOptions = {
+      useSSL: false,
+      timeout: 10,
+      onSuccess: onConnectSuccess,
+      onFailure: onConnectFailure,
+      keepAliveInterval: 30,
+      cleanSession: true
+    };
+    
+    mqttClient.connect(connectOptions);
+  }
+
+  function onConnectSuccess() {
+    console.log("MQTT Connected to HiveMQ");
+    connectionStatus = true;
+    mqttStatusText.innerText = "MQTT: Connected ✅";
+    mqttLed.className = "led led-green";
+    // subscribe to sensor topic
+    mqttClient.subscribe(TOPIC_SENSOR, { qos: 0 });
+    // Optionally send a small retained will? not needed.
+    // Publish a startup message (optional)
+    mqttClient.send(TOPIC_SENSOR, "dashboard_online", 0, false);
+  }
+
+  function onConnectFailure(err) {
+    console.error("MQTT Connection failed:", err);
+    connectionStatus = false;
+    mqttStatusText.innerText = "MQTT: Disconnected (retrying in 5s)";
+    mqttLed.className = "led led-red";
+    setTimeout(() => {
+      if (mqttClient && !connectionStatus) {
+        try {
+          initMqtt();
+        } catch(e) { console.log(e); }
+      }
+    }, 5000);
+  }
+
+  function onConnectionLost(response) {
+    console.log("Connection lost:", response.errorMessage);
+    connectionStatus = false;
+    mqttStatusText.innerText = "MQTT: Lost connection, reconnecting...";
+    mqttLed.className = "led led-red";
+    setTimeout(() => {
+      if (mqttClient) {
+        try {
+          initMqtt();
+        } catch(e) { console.warn(e); }
+      }
+    }, 4000);
+  }
+
+  function onMessageArrived(message) {
+    // message.payloadString, message.destinationName
+    onMessageReceived(message.destinationName, message.payloadString);
+  }
+
+  // update threshold and re-evaluate pump + moisture interpretation
+  function setThresholdAndApply(newThreshold) {
+    currentThreshold = newThreshold;
+    thresholdSlider.value = newThreshold;
+    thresholdValueSpan.innerText = newThreshold;
+    // re-evaluate pump logic with existing sensor data
+    if (lastMoistureValue !== null) {
+      updatePumpAndUI();
+      // also refresh moisture display style based on new threshold
+      updateMoistureDisplay(lastMoistureValue);
+    } else {
+      // just show info
+      moistureInterpret.innerHTML = `⏳ Menunggu data sensor... threshold = ${currentThreshold}`;
+    }
+    // additional: show visual effect on threshold
+  }
+
+  // ========== UI Event Listeners ==========
+  thresholdSlider.addEventListener("input", (e) => {
+    const val = parseInt(e.target.value, 10);
+    thresholdValueSpan.innerText = val;
+    // realtime preview (not applied to logic until button click, but we show live preview)
+    // But we also optionally apply immediately? we use button, but for better UX we can show preview.
+    // However pump state should reflect only after click (user can compare)
+    // We'll show temporary hint, but logic applies on click.
+    const previewVal = val;
+    if (lastMoistureValue !== null) {
+      const previewPump = (lastMoistureValue >= previewVal);
+      if (previewPump) {
+        moistureInterpret.innerHTML = `🔍 PREVIEW: KERING — pompa AKTIF jika threshold = ${previewVal}`;
+      } else {
+        moistureInterpret.innerHTML = `🔍 PREVIEW: LEMBAP — pompa NONAKTIF jika threshold = ${previewVal}`;
+      }
+    } else {
+      moistureInterpret.innerHTML = `Geser threshold ke ${previewVal} (belum ada data sensor)`;
+    }
+  });
+
+  applyBtn.addEventListener("click", () => {
+    const newTh = parseInt(thresholdSlider.value, 10);
+    if (!isNaN(newTh)) {
+      setThresholdAndApply(newTh);
+      // optional: show feedback
+      moistureInterpret.style.transition = "0.1s";
+      moistureInterpret.style.transform = "scale(0.99)";
+      setTimeout(() => { moistureInterpret.style.transform = ""; }, 150);
+    } else {
+      setThresholdAndApply(700);
+    }
+  });
+
+  // simulate init threshold from slider default
+  function initDashboard() {
+    currentThreshold = 700;
+    thresholdSlider.value = 700;
+    thresholdValueSpan.innerText = "700";
+    lastMoistureValue = null;
+    moistureSpan.innerText = "---";
+    pumpStateText.innerText = "NO DATA";
+    pumpIcon.innerHTML = "🔄";
+    // MQTT start
+    initMqtt();
+
+    // Additional fallback: if no message after 12 seconds, show waiting hint
+    setTimeout(() => {
+      if (lastMoistureValue === null) {
+        moistureInterpret.innerHTML = "⏳ Belum menerima data dari ESP8266. Pastikan ESP terhubung ke WiFi dan publish ke MQTT.";
+      }
+    }, 10000);
+  }
+
+  // optional reconnect resilience if page visibility
+  window.addEventListener("load", () => {
+    initDashboard();
+  });
+
+  // manual cleanup not needed
+  // also handle scenario where ESP sends values (0-1023)
+  // the logic matches code: sensorValue >= threshold -> relay LOW -> pump ON
+  // show proper indicator
+  // Additional: last update text improvement
+  // If user wants to see exact logic from the device: we mirror exactly the same condition.
+  console.log("Dashboard ready - waiting for MQTT messages on iot/soil/moisture");
+</script>
+</body>
+</html>
