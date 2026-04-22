@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dashboard IoT | Soil Moisture Monitor</title>
+  <title>Dashboard SKT01 | Soil Moisture Monitor</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
@@ -15,7 +15,7 @@
 
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: linear-gradient(135deg, #1a472a 0%, #2d5a3b 100%);
       min-height: 100vh;
       padding: 20px;
     }
@@ -25,7 +25,6 @@
       margin: 0 auto;
     }
 
-    /* Header */
     .header {
       background: rgba(255,255,255,0.95);
       border-radius: 20px;
@@ -47,6 +46,15 @@
       gap: 10px;
     }
 
+    .device-id {
+      background: #3498db;
+      color: white;
+      padding: 5px 15px;
+      border-radius: 50px;
+      font-size: 0.8rem;
+      font-weight: bold;
+    }
+
     .logout-btn {
       background: #e74c3c;
       color: white;
@@ -63,7 +71,6 @@
       transform: scale(0.95);
     }
 
-    /* MQTT Indicator */
     .mqtt-box {
       display: flex;
       align-items: center;
@@ -101,7 +108,6 @@
       50% { opacity: 0.3; }
     }
 
-    /* Grid */
     .grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
@@ -168,7 +174,6 @@
       color: white;
     }
 
-    /* Slider */
     .threshold-control {
       margin-top: 20px;
       padding: 15px;
@@ -217,12 +222,21 @@
       margin-top: 15px;
       font-size: 0.85rem;
     }
+
+    .topic-info {
+      background: #2c3e50;
+      color: #3498db;
+      font-family: monospace;
+    }
   </style>
 </head>
 <body>
 <div class="container">
   <div class="header">
-    <h1>🌱 Smart Irrigation Dashboard</h1>
+    <h1>
+      🌱 Smart Irrigation SKT01
+      <span class="device-id">SKT01</span>
+    </h1>
     <div style="display: flex; gap: 15px;">
       <div class="mqtt-box">
         <div class="indicator connecting" id="mqttIndicator"></div>
@@ -233,7 +247,6 @@
   </div>
 
   <div class="grid">
-    <!-- Sensor Card -->
     <div class="card">
       <div class="card-title">💧 Nilai Sensor Tanah</div>
       <div class="sensor-value" id="sensorValue">---</div>
@@ -241,7 +254,6 @@
       <div class="info">📊 Range: 0 (basah) - 1023 (kering)</div>
     </div>
 
-    <!-- Pump Card -->
     <div class="card">
       <div class="card-title">🚰 Status Pompa</div>
       <div class="pump-icon" id="pumpIcon">⛲</div>
@@ -258,11 +270,11 @@
     </div>
   </div>
 
-  <!-- Chart -->
   <div class="chart-container">
     <div class="card-title">📈 Grafik Sensor Real-time</div>
     <canvas id="sensorChart"></canvas>
-    <div class="info" style="margin-top: 10px;">
+    <div class="info">
+      📨 MQTT Topic: <strong class="topic-info">iot/soilmoisture/SKT01</strong><br>
       🕒 Update terakhir: <strong id="lastUpdate">--:--:--</strong>
     </div>
   </div>
@@ -270,11 +282,10 @@
 
 <script>
   // ========= KONFIGURASI =========
-  // Menggunakan WebSocket port 8080 (alternatif yang lebih stabil)
   const MQTT_BROKER = "broker.hivemq.com";
-  const MQTT_PORT = 8080;  // Ganti ke 8080 (WebSocket over TLS lebih stabil)
-  const MQTT_TOPIC = "iot/soil/moisture";
-  const CLIENT_ID = "web_" + Math.random().toString(36).substr(2, 8);
+  const MQTT_PORT = 8080;
+  const MQTT_TOPIC = "iot/soilmoisture/SKT01";  // GANTI TOPIC
+  const CLIENT_ID = "web_SKT01_" + Math.random().toString(36).substr(2, 8);
   
   let client = null;
   let lastValue = null;
@@ -296,14 +307,12 @@
   const thresholdVal = document.getElementById('thresholdVal');
   const lastUpdateEl = document.getElementById('lastUpdate');
   
-  // ========= FUNGSI UPDATE UI =========
   function updateUI(value) {
     if (value === null) return;
     
     lastValue = value;
     sensorValueEl.innerHTML = value;
     
-    // Update status kelembaban
     if (value >= currentThreshold) {
       moistureStatusEl.innerHTML = "🌵 TANAH KERING → Pompa AKTIF";
       moistureStatusEl.style.background = "#ff9800";
@@ -320,15 +329,11 @@
       pumpIconEl.innerHTML = "⛲💤";
     }
     
-    // Update waktu
     const now = new Date();
     lastUpdateEl.innerHTML = now.toLocaleTimeString();
-    
-    // Update grafik
     addToChart(value);
   }
   
-  // ========= GRAFIK =========
   function initChart() {
     const ctx = document.getElementById('sensorChart').getContext('2d');
     chart = new Chart(ctx, {
@@ -336,7 +341,7 @@
       data: {
         labels: [],
         datasets: [{
-          label: 'Nilai Sensor Tanah',
+          label: 'Nilai Sensor Tanah SKT01',
           data: [],
           borderColor: '#3498db',
           backgroundColor: 'rgba(52, 152, 219, 0.1)',
@@ -369,7 +374,6 @@
     chart.update();
   }
   
-  // ========= MQTT DENGAN AUTO RECONNECT =========
   function updateMQTTIndicator(state, message) {
     mqttIndicator.className = 'indicator';
     if (state === 'connecting') {
@@ -391,14 +395,11 @@
     
     updateMQTTIndicator('connecting', 'Menghubungkan ke broker...');
     
-    // Gunakan WebSocket dengan port 8080 (lebih stabil)
     client = new Paho.MQTT.Client(MQTT_BROKER, MQTT_PORT, CLIENT_ID);
     
     client.onConnectionLost = (response) => {
       console.log("MQTT Lost:", response.errorMessage);
       updateMQTTIndicator('disconnected', 'Koneksi putus, mencoba ulang...');
-      
-      // Auto reconnect setelah 5 detik
       if (reconnectTimer) clearTimeout(reconnectTimer);
       reconnectTimer = setTimeout(() => {
         reconnectAttempts++;
@@ -411,7 +412,7 @@
         const val = parseInt(message.payloadString);
         if (!isNaN(val)) {
           updateUI(val);
-          reconnectAttempts = 0; // Reset attempts jika berhasil terima data
+          reconnectAttempts = 0;
         }
       }
     };
@@ -427,7 +428,6 @@
       onFailure: (err) => {
         console.error("MQTT Failed:", err);
         updateMQTTIndicator('disconnected', `Gagal (${reconnectAttempts + 1}), mencoba ulang...`);
-        
         if (reconnectTimer) clearTimeout(reconnectTimer);
         reconnectTimer = setTimeout(() => {
           reconnectAttempts++;
@@ -441,7 +441,6 @@
     client.connect(connectOptions);
   }
   
-  // ========= THRESHOLD =========
   function applyThreshold() {
     currentThreshold = parseInt(thresholdSlider.value);
     thresholdVal.innerHTML = currentThreshold;
@@ -450,7 +449,6 @@
     }
   }
   
-  // ========= LOGOUT =========
   function logout() {
     if (client && client.isConnected()) {
       client.disconnect();
@@ -458,7 +456,6 @@
     window.location.href = "https://teknikotomasiindustrinepan.github.io/projects/dashboard_user.html";
   }
   
-  // ========= INIT =========
   function init() {
     initChart();
     thresholdSlider.addEventListener('input', () => {
