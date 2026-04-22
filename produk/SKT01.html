@@ -2,11 +2,9 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-  <title>Dashboard | Smart Irrigation Monitor</title>
-  <!-- Paho MQTT over WebSocket -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard IoT | Soil Moisture Monitor</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
-  <!-- Chart.js untuk grafik -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
     * {
@@ -16,8 +14,8 @@
     }
 
     body {
-      font-family: 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
-      background: linear-gradient(145deg, #e0f2e9 0%, #c8e0d4 100%);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       min-height: 100vh;
       padding: 20px;
     }
@@ -27,484 +25,393 @@
       margin: 0 auto;
     }
 
-    /* Header dengan logout */
+    /* Header */
     .header {
+      background: rgba(255,255,255,0.95);
+      border-radius: 20px;
+      padding: 15px 25px;
+      margin-bottom: 25px;
       display: flex;
       justify-content: space-between;
       align-items: center;
       flex-wrap: wrap;
-      margin-bottom: 25px;
-      background: rgba(30, 40, 35, 0.85);
-      backdrop-filter: blur(8px);
-      padding: 15px 25px;
-      border-radius: 60px;
-      color: white;
+      gap: 15px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
     }
 
     .header h1 {
-      font-size: 1.6rem;
+      color: #2c3e50;
+      font-size: 1.5rem;
       display: flex;
       align-items: center;
       gap: 10px;
     }
 
     .logout-btn {
-      background: #c0392b;
-      border: none;
-      padding: 10px 24px;
-      border-radius: 40px;
+      background: #e74c3c;
       color: white;
-      font-weight: bold;
+      border: none;
+      padding: 10px 25px;
+      border-radius: 50px;
       cursor: pointer;
-      font-size: 0.9rem;
-      transition: 0.2s;
-      display: flex;
-      align-items: center;
-      gap: 8px;
+      font-weight: bold;
+      transition: 0.3s;
     }
 
     .logout-btn:hover {
-      background: #a82315;
-      transform: scale(0.97);
+      background: #c0392b;
+      transform: scale(0.95);
     }
 
-    /* MQTT Lampu Indikator (tanpa teks panjang) */
-    .mqtt-indicator {
-      background: #1e2a2e;
-      border-radius: 50px;
-      padding: 8px 20px;
-      display: inline-flex;
+    /* MQTT Indicator */
+    .mqtt-box {
+      display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 15px;
+      background: #f0f0f0;
+      padding: 8px 20px;
+      border-radius: 50px;
     }
 
-    .lamp {
-      width: 16px;
-      height: 16px;
+    .indicator {
+      width: 14px;
+      height: 14px;
       border-radius: 50%;
-      transition: all 0.2s;
-      box-shadow: 0 0 4px currentColor;
+      transition: all 0.3s;
     }
 
-    .lamp-yellow {
+    .indicator.connecting {
       background: #f39c12;
-      box-shadow: 0 0 8px #f39c12;
-      animation: pulse 1s infinite;
+      box-shadow: 0 0 10px #f39c12;
+      animation: blink 1s infinite;
     }
 
-    .lamp-green {
+    .indicator.connected {
       background: #2ecc71;
       box-shadow: 0 0 10px #2ecc71;
     }
 
-    .lamp-red {
+    .indicator.disconnected {
       background: #e74c3c;
-      box-shadow: 0 0 8px #e74c3c;
+      box-shadow: 0 0 10px #e74c3c;
     }
 
-    @keyframes pulse {
+    @keyframes blink {
       0%, 100% { opacity: 1; }
-      50% { opacity: 0.5; }
-    }
-
-    .indicator-text {
-      font-size: 0.8rem;
-      font-weight: 500;
-      color: #ddd;
+      50% { opacity: 0.3; }
     }
 
     /* Grid */
     .grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-      gap: 24px;
-      margin-bottom: 30px;
+      gap: 25px;
+      margin-bottom: 25px;
     }
 
     .card {
-      background: rgba(255, 255, 255, 0.95);
-      border-radius: 32px;
-      padding: 22px;
-      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
+      background: rgba(255,255,255,0.95);
+      border-radius: 20px;
+      padding: 25px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.1);
     }
 
     .card-title {
       font-size: 1.3rem;
-      font-weight: 700;
-      margin-bottom: 18px;
+      font-weight: bold;
+      margin-bottom: 20px;
       padding-bottom: 10px;
-      border-bottom: 3px solid #2e7d32;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      color: #1f3b2c;
+      border-bottom: 3px solid #3498db;
+      color: #2c3e50;
     }
 
-    /* Sensor value */
-    .sensor-big {
+    .sensor-value {
       text-align: center;
-      font-size: 3.8rem;
-      font-weight: 800;
+      font-size: 4rem;
+      font-weight: bold;
       font-family: monospace;
-      background: #f0f7f0;
-      border-radius: 50px;
+      background: #ecf0f1;
+      border-radius: 20px;
       padding: 20px;
-      margin: 12px 0;
+      margin: 15px 0;
     }
 
-    .moisture-status {
-      text-align: center;
-      font-weight: 600;
-      padding: 10px;
-      border-radius: 40px;
-      background: #e8f0e8;
-      margin-top: 8px;
-    }
-
-    /* Pump display */
-    .pump-area {
+    .status-text {
       text-align: center;
       padding: 12px;
+      border-radius: 15px;
+      font-weight: bold;
+      margin-top: 10px;
     }
 
     .pump-icon {
-      font-size: 4.5rem;
-      margin: 10px 0;
+      text-align: center;
+      font-size: 4rem;
+      margin: 20px 0;
     }
 
-    .pump-badge {
-      font-size: 1.5rem;
+    .pump-status {
+      text-align: center;
+      font-size: 1.3rem;
       font-weight: bold;
-      padding: 10px 20px;
-      border-radius: 60px;
-      display: inline-block;
+      padding: 12px;
+      border-radius: 15px;
     }
 
     .pump-on {
-      background: #ffd966;
-      color: #b45f06;
+      background: #ff9800;
+      color: white;
     }
 
     .pump-off {
-      background: #d5e8cf;
-      color: #2e5c2e;
+      background: #4caf50;
+      color: white;
     }
 
-    /* Threshold slider */
-    .threshold-box {
-      background: #fef9e6;
-      border-radius: 28px;
-      padding: 18px;
-      margin-top: 15px;
-    }
-
-    .slider-row {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 12px;
-      margin: 12px 0;
+    /* Slider */
+    .threshold-control {
+      margin-top: 20px;
+      padding: 15px;
+      background: #ecf0f1;
+      border-radius: 15px;
     }
 
     input[type="range"] {
-      flex: 1;
-      height: 6px;
-      border-radius: 3px;
-      background: #bbb;
-    }
-
-    .threshold-num {
-      background: #2d3e2d;
-      color: white;
-      padding: 5px 14px;
-      border-radius: 40px;
-      font-family: monospace;
+      width: 100%;
+      margin: 10px 0;
     }
 
     button {
-      background: #2c6e2c;
-      border: none;
-      padding: 8px 18px;
-      border-radius: 40px;
+      background: #3498db;
       color: white;
-      font-weight: bold;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 10px;
       cursor: pointer;
-      transition: 0.2s;
+      margin-top: 10px;
+      width: 100%;
+      font-weight: bold;
     }
 
     button:hover {
-      background: #1e551e;
+      background: #2980b9;
     }
 
-    /* Grafik card full width */
-    .chart-card {
-      background: rgba(255, 255, 255, 0.95);
-      border-radius: 32px;
-      padding: 22px;
-      margin-top: 10px;
-      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
+    .chart-container {
+      background: rgba(255,255,255,0.95);
+      border-radius: 20px;
+      padding: 20px;
+      margin-top: 20px;
     }
 
     canvas {
-      max-height: 280px;
-      width: 100%;
+      max-height: 300px;
     }
 
-    .info-row {
-      display: flex;
-      justify-content: space-between;
-      margin-top: 15px;
-      font-size: 0.8rem;
-      color: #2c5e2c;
-      background: #e2ecd9;
-      padding: 12px 18px;
-      border-radius: 40px;
-    }
-
-    footer {
+    .info {
+      background: #34495e;
+      color: white;
+      padding: 10px;
+      border-radius: 10px;
       text-align: center;
-      margin-top: 25px;
-      font-size: 0.7rem;
-      color: #2c5e2c;
+      margin-top: 15px;
+      font-size: 0.85rem;
     }
   </style>
 </head>
 <body>
 <div class="container">
-  <!-- Header dengan logout -->
   <div class="header">
-    <h1>🌱 Smart Irrigation Monitor</h1>
-    <div style="display: flex; gap: 15px; align-items: center;">
-      <div class="mqtt-indicator">
-        <div class="lamp" id="mqttLamp"></div>
-        <span class="indicator-text" id="mqttLabel">MQTT</span>
+    <h1>🌱 Smart Irrigation Dashboard</h1>
+    <div style="display: flex; gap: 15px;">
+      <div class="mqtt-box">
+        <div class="indicator connecting" id="mqttIndicator"></div>
+        <span id="mqttStatus">Menghubungkan...</span>
       </div>
-      <button class="logout-btn" id="logoutBtn">🚪 Logout</button>
+      <button class="logout-btn" onclick="logout()">🚪 Logout</button>
     </div>
   </div>
 
-  <!-- Grid utama -->
   <div class="grid">
-    <!-- Card Sensor -->
+    <!-- Sensor Card -->
     <div class="card">
-      <div class="card-title">
-        💧 Kelembaban Tanah
-      </div>
-      <div class="sensor-big" id="sensorValue">---</div>
-      <div class="moisture-status" id="moistureDesc">Menunggu data...</div>
-      <div style="font-size: 0.7rem; text-align: center; margin-top: 12px;">
-        🔽 Nilai tinggi = tanah KERING
-      </div>
+      <div class="card-title">💧 Nilai Sensor Tanah</div>
+      <div class="sensor-value" id="sensorValue">---</div>
+      <div class="status-text" id="moistureStatus">Menunggu data...</div>
+      <div class="info">📊 Range: 0 (basah) - 1023 (kering)</div>
     </div>
 
-    <!-- Card Pompa + Threshold -->
+    <!-- Pump Card -->
     <div class="card">
-      <div class="card-title">
-        🚰 Pompa / Relay
-      </div>
-      <div class="pump-area">
-        <div class="pump-icon" id="pumpIcon">⛲</div>
-        <div class="pump-badge" id="pumpText">--</div>
-      </div>
-      <div class="threshold-box">
-        <div style="font-weight: bold; margin-bottom: 8px;">⚙️ Ambang Kekeringan</div>
-        <div class="slider-row">
-          <span>📊</span>
-          <input type="range" id="thresholdSlider" min="300" max="900" value="700" step="5">
-          <span class="threshold-num" id="thresholdDisplay">700</span>
-        </div>
-        <button id="applyThreshold">Terapkan Threshold</button>
-        <div style="font-size: 0.7rem; margin-top: 10px;">
-          * Jika sensor ≥ threshold → Pompa ON (menyiram)
+      <div class="card-title">🚰 Status Pompa</div>
+      <div class="pump-icon" id="pumpIcon">⛲</div>
+      <div class="pump-status pump-off" id="pumpStatus">OFF</div>
+      
+      <div class="threshold-control">
+        <label>⚙️ Ambang Batas (Threshold): <strong id="thresholdVal">700</strong></label>
+        <input type="range" id="thresholdSlider" min="300" max="900" value="700" step="10">
+        <button onclick="applyThreshold()">Terapkan Threshold</button>
+        <div class="info" style="margin-top: 10px; background: #bdc3c7; color: #2c3e50;">
+          💡 Jika sensor ≥ threshold → Pompa ON (menyiram)
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Grafik Sensor -->
-  <div class="chart-card">
-    <div class="card-title">
-      📈 Grafik Sensor Tanah (Real-time)
-    </div>
-    <canvas id="sensorChart" width="400" height="200"></canvas>
-    <div class="info-row">
-      <span>📡 Topic MQTT: <strong>iot/soil/moisture</strong></span>
-      <span>🕒 Update terakhir: <strong id="lastUpdateTime">--:--:--</strong></span>
+  <!-- Chart -->
+  <div class="chart-container">
+    <div class="card-title">📈 Grafik Sensor Real-time</div>
+    <canvas id="sensorChart"></canvas>
+    <div class="info" style="margin-top: 10px;">
+      🕒 Update terakhir: <strong id="lastUpdate">--:--:--</strong>
     </div>
   </div>
-
-  <footer>
-    ⚡ Dashboard terhubung via MQTT WebSocket | Nilai sensor dikirim dari ESP8266 setiap 5 detik
-  </footer>
 </div>
 
 <script>
   // ========= KONFIGURASI =========
+  // Menggunakan WebSocket port 8080 (alternatif yang lebih stabil)
   const MQTT_BROKER = "broker.hivemq.com";
-  const MQTT_PORT = 8000;
+  const MQTT_PORT = 8080;  // Ganti ke 8080 (WebSocket over TLS lebih stabil)
   const MQTT_TOPIC = "iot/soil/moisture";
-  const CLIENT_ID = "dashboard_" + Math.random().toString(36).substr(2, 10);
-
-  // State
-  let client = null;
-  let connectionState = "connecting"; // connecting, connected, disconnected
-  let lastSensorValue = null;
-  let currentThreshold = 700;
+  const CLIENT_ID = "web_" + Math.random().toString(36).substr(2, 8);
   
-  // Data untuk grafik (max 20 points)
+  let client = null;
+  let lastValue = null;
+  let currentThreshold = 700;
+  let chart = null;
   let chartData = [];
   let chartLabels = [];
-  let sensorChart = null;
-
-  // DOM elements
-  const mqttLamp = document.getElementById("mqttLamp");
-  const mqttLabel = document.getElementById("mqttLabel");
-  const sensorValueEl = document.getElementById("sensorValue");
-  const moistureDescEl = document.getElementById("moistureDesc");
-  const pumpIconEl = document.getElementById("pumpIcon");
-  const pumpTextEl = document.getElementById("pumpText");
-  const thresholdSlider = document.getElementById("thresholdSlider");
-  const thresholdDisplay = document.getElementById("thresholdDisplay");
-  const applyBtn = document.getElementById("applyThreshold");
-  const lastUpdateTimeEl = document.getElementById("lastUpdateTime");
-
-  // ========= FUNGSI UPDATE LAMPU MQTT =========
-  function updateMqttLamp(state) {
-    // state: 'connecting', 'connected', 'disconnected'
-    mqttLamp.className = "lamp";
-    if (state === "connecting") {
-      mqttLamp.classList.add("lamp-yellow");
-      mqttLabel.innerText = "MENGHUBUNG";
-    } else if (state === "connected") {
-      mqttLamp.classList.add("lamp-green");
-      mqttLabel.innerText = "TERSAMBU";
-    } else {
-      mqttLamp.classList.add("lamp-red");
-      mqttLabel.innerText = "PUTUS";
-    }
-    connectionState = state;
-  }
-
-  // ========= UPDATE UI BERDASARKAN SENSOR & THRESHOLD =========
-  function updateUIFromSensor(value) {
+  let reconnectAttempts = 0;
+  let reconnectTimer = null;
+  
+  // DOM Elements
+  const mqttIndicator = document.getElementById('mqttIndicator');
+  const mqttStatus = document.getElementById('mqttStatus');
+  const sensorValueEl = document.getElementById('sensorValue');
+  const moistureStatusEl = document.getElementById('moistureStatus');
+  const pumpIconEl = document.getElementById('pumpIcon');
+  const pumpStatusEl = document.getElementById('pumpStatus');
+  const thresholdSlider = document.getElementById('thresholdSlider');
+  const thresholdVal = document.getElementById('thresholdVal');
+  const lastUpdateEl = document.getElementById('lastUpdate');
+  
+  // ========= FUNGSI UPDATE UI =========
+  function updateUI(value) {
     if (value === null) return;
     
-    lastSensorValue = value;
-    sensorValueEl.innerText = value;
+    lastValue = value;
+    sensorValueEl.innerHTML = value;
     
-    // Tentukan status kelembaban
+    // Update status kelembaban
     if (value >= currentThreshold) {
-      moistureDescEl.innerHTML = "🌵 TANAH KERING → Pompa AKTIF";
-      moistureDescEl.style.background = "#ffecb3";
-      moistureDescEl.style.color = "#b45f06";
-    } else {
-      moistureDescEl.innerHTML = "💧 TANAH LEMBAP → Pompa MATI";
-      moistureDescEl.style.background = "#c8e6df";
-      moistureDescEl.style.color = "#1e6b3b";
-    }
-    
-    // Update status pompa
-    const pumpActive = (value >= currentThreshold);
-    if (pumpActive) {
-      pumpTextEl.innerText = "💦 POMPA ON (MENYIRAM)";
-      pumpTextEl.className = "pump-badge pump-on";
+      moistureStatusEl.innerHTML = "🌵 TANAH KERING → Pompa AKTIF";
+      moistureStatusEl.style.background = "#ff9800";
+      moistureStatusEl.style.color = "white";
+      pumpStatusEl.innerHTML = "💦 POMPA ON (MENYIRAM)";
+      pumpStatusEl.className = "pump-status pump-on";
       pumpIconEl.innerHTML = "💧🚰💧";
     } else {
-      pumpTextEl.innerText = "⭕ POMPA OFF (MATI)";
-      pumpTextEl.className = "pump-badge pump-off";
+      moistureStatusEl.innerHTML = "💧 TANAH LEMBAP → Pompa MATI";
+      moistureStatusEl.style.background = "#4caf50";
+      moistureStatusEl.style.color = "white";
+      pumpStatusEl.innerHTML = "⭕ POMPA OFF";
+      pumpStatusEl.className = "pump-status pump-off";
       pumpIconEl.innerHTML = "⛲💤";
     }
     
-    // Update waktu terakhir
+    // Update waktu
     const now = new Date();
-    lastUpdateTimeEl.innerText = now.toLocaleTimeString();
+    lastUpdateEl.innerHTML = now.toLocaleTimeString();
     
-    // Tambahkan ke grafik
-    addChartData(value);
+    // Update grafik
+    addToChart(value);
   }
   
   // ========= GRAFIK =========
   function initChart() {
     const ctx = document.getElementById('sensorChart').getContext('2d');
-    sensorChart = new Chart(ctx, {
+    chart = new Chart(ctx, {
       type: 'line',
       data: {
         labels: [],
         datasets: [{
-          label: 'Nilai Sensor Tanah (ADC)',
+          label: 'Nilai Sensor Tanah',
           data: [],
-          borderColor: '#2e7d32',
-          backgroundColor: 'rgba(46, 125, 50, 0.1)',
+          borderColor: '#3498db',
+          backgroundColor: 'rgba(52, 152, 219, 0.1)',
           borderWidth: 2,
           fill: true,
-          tension: 0.3,
-          pointRadius: 4,
-          pointBackgroundColor: '#1b5e2a'
+          tension: 0.3
         }]
       },
       options: {
         responsive: true,
         maintainAspectRatio: true,
         scales: {
-          y: {
-            min: 0,
-            max: 1024,
-            title: { display: true, text: 'Nilai Sensor (0-1023)' }
-          },
-          x: {
-            title: { display: true, text: 'Waktu (detik ke-)', font: { size: 11 } }
-          }
-        },
-        plugins: {
-          tooltip: { callbacks: { label: (ctx) => `Nilai: ${ctx.raw}` } },
-          legend: { position: 'top' }
+          y: { min: 0, max: 1024, title: { display: true, text: 'Nilai ADC' } }
         }
       }
     });
   }
   
-  function addChartData(value) {
-    if (!sensorChart) return;
-    const now = new Date();
-    const timeLabel = now.toLocaleTimeString([], { hour: '2-digit', minute:'2-digit', second:'2-digit' });
-    
+  function addToChart(value) {
+    if (!chart) return;
+    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute:'2-digit', second:'2-digit' });
     chartData.push(value);
-    chartLabels.push(timeLabel);
-    
-    // Maksimal 20 data
+    chartLabels.push(time);
     if (chartData.length > 20) {
       chartData.shift();
       chartLabels.shift();
     }
-    
-    sensorChart.data.labels = chartLabels;
-    sensorChart.data.datasets[0].data = chartData;
-    sensorChart.update();
+    chart.data.labels = chartLabels;
+    chart.data.datasets[0].data = chartData;
+    chart.update();
   }
   
-  // ========= MQTT =========
+  // ========= MQTT DENGAN AUTO RECONNECT =========
+  function updateMQTTIndicator(state, message) {
+    mqttIndicator.className = 'indicator';
+    if (state === 'connecting') {
+      mqttIndicator.classList.add('connecting');
+      mqttStatus.innerHTML = message || 'Menghubungkan...';
+    } else if (state === 'connected') {
+      mqttIndicator.classList.add('connected');
+      mqttStatus.innerHTML = message || 'Tersambung ✓';
+    } else {
+      mqttIndicator.classList.add('disconnected');
+      mqttStatus.innerHTML = message || 'Terputus ↻';
+    }
+  }
+  
   function connectMQTT() {
-    updateMqttLamp("connecting");
+    if (client && client.isConnected()) {
+      try { client.disconnect(); } catch(e) {}
+    }
     
+    updateMQTTIndicator('connecting', 'Menghubungkan ke broker...');
+    
+    // Gunakan WebSocket dengan port 8080 (lebih stabil)
     client = new Paho.MQTT.Client(MQTT_BROKER, MQTT_PORT, CLIENT_ID);
     
     client.onConnectionLost = (response) => {
-      console.log("MQTT lost:", response.errorMessage);
-      updateMqttLamp("disconnected");
+      console.log("MQTT Lost:", response.errorMessage);
+      updateMQTTIndicator('disconnected', 'Koneksi putus, mencoba ulang...');
+      
       // Auto reconnect setelah 5 detik
-      setTimeout(() => {
-        if (connectionState !== "connected") {
-          connectMQTT();
-        }
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      reconnectTimer = setTimeout(() => {
+        reconnectAttempts++;
+        connectMQTT();
       }, 5000);
     };
     
     client.onMessageArrived = (message) => {
       if (message.destinationName === MQTT_TOPIC) {
-        const payload = message.payloadString.trim();
-        const val = parseInt(payload, 10);
+        const val = parseInt(message.payloadString);
         if (!isNaN(val)) {
-          updateUIFromSensor(val);
+          updateUI(val);
+          reconnectAttempts = 0; // Reset attempts jika berhasil terima data
         }
       }
     };
@@ -513,16 +420,18 @@
       timeout: 10,
       onSuccess: () => {
         console.log("MQTT Connected!");
-        updateMqttLamp("connected");
+        updateMQTTIndicator('connected', 'Tersambung | Menunggu data...');
         client.subscribe(MQTT_TOPIC, { qos: 0 });
+        reconnectAttempts = 0;
       },
       onFailure: (err) => {
-        console.error("MQTT failed:", err);
-        updateMqttLamp("disconnected");
-        setTimeout(() => {
-          if (connectionState !== "connected") {
-            connectMQTT();
-          }
+        console.error("MQTT Failed:", err);
+        updateMQTTIndicator('disconnected', `Gagal (${reconnectAttempts + 1}), mencoba ulang...`);
+        
+        if (reconnectTimer) clearTimeout(reconnectTimer);
+        reconnectTimer = setTimeout(() => {
+          reconnectAttempts++;
+          connectMQTT();
         }, 5000);
       },
       keepAliveInterval: 30,
@@ -534,44 +443,31 @@
   
   // ========= THRESHOLD =========
   function applyThreshold() {
-    const newTh = parseInt(thresholdSlider.value, 10);
-    if (!isNaN(newTh)) {
-      currentThreshold = newTh;
-      thresholdDisplay.innerText = newTh;
-      // Update ulang UI dengan data terakhir
-      if (lastSensorValue !== null) {
-        updateUIFromSensor(lastSensorValue);
-      }
+    currentThreshold = parseInt(thresholdSlider.value);
+    thresholdVal.innerHTML = currentThreshold;
+    if (lastValue !== null) {
+      updateUI(lastValue);
     }
   }
   
   // ========= LOGOUT =========
   function logout() {
-    // Redirect ke dashboard_user.html
+    if (client && client.isConnected()) {
+      client.disconnect();
+    }
     window.location.href = "https://teknikotomasiindustrinepan.github.io/projects/dashboard_user.html";
   }
   
   // ========= INIT =========
   function init() {
     initChart();
-    
-    // Set threshold slider
-    thresholdSlider.value = currentThreshold;
-    thresholdDisplay.innerText = currentThreshold;
-    
-    // Event listeners
-    applyBtn.addEventListener("click", applyThreshold);
-    thresholdSlider.addEventListener("input", (e) => {
-      thresholdDisplay.innerText = e.target.value;
+    thresholdSlider.addEventListener('input', () => {
+      thresholdVal.innerHTML = thresholdSlider.value;
     });
-    document.getElementById("logoutBtn").addEventListener("click", logout);
-    
-    // Mulai koneksi MQTT
     connectMQTT();
   }
   
-  // Jalankan init saat halaman siap
-  window.addEventListener("load", init);
+  window.addEventListener('load', init);
 </script>
 </body>
 </html>
