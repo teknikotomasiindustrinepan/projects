@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>SP01 - Ultrasonic Water Pump Controller | Monitoring Jarak & Pompa</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0f4c5c 0%, #1e3a5f 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 950px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            transition: transform 0.3s;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            color: #0a3b47;
+            font-size: 26px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #2c6e7e;
+            font-size: 14px;
+        }
+
+        .sensor-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .sensor-card {
+            text-align: center;
+            background: linear-gradient(135deg, #1a6d7c 0%, #0e4d63 100%);
+            color: white;
+            border-radius: 15px;
+            padding: 20px;
+            transition: all 0.3s;
+        }
+
+        .sensor-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+
+        .sensor-label {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-bottom: 10px;
+        }
+
+        .sensor-value {
+            font-size: 44px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+
+        .sensor-unit {
+            font-size: 20px;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 12px;
+            font-size: 11px;
+            opacity: 0.9;
+        }
+
+        .status-card {
+            background: #e6f3f5;
+            border-radius: 15px;
+            padding: 15px;
+            text-align: center;
+        }
+
+        .pump-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            background: #fff;
+            border-radius: 40px;
+            padding: 8px 24px;
+            margin: 10px 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .pump-led {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: gray;
+            box-shadow: 0 0 5px rgba(0,0,0,0.2);
+            transition: all 0.3s;
+        }
+
+        .pump-led.on {
+            background: #00e676;
+            box-shadow: 0 0 12px #00e676;
+            animation: pumpBlink 1s ease-in-out infinite;
+        }
+
+        @keyframes pumpBlink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        .pump-led.off {
+            background: #9e9e9e;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .status-online {
+            background-color: #10b981;
+            box-shadow: 0 0 5px #10b981;
+        }
+
+        .status-offline {
+            background-color: #ef4444;
+            box-shadow: 0 0 5px #ef4444;
+        }
+
+        .last-update {
+            font-size: 12px;
+            color: #2c6e7e;
+            margin-top: 15px;
+            text-align: center;
+        }
+
+        canvas {
+            max-height: 320px;
+            width: 100%;
+            margin-top: 15px;
+        }
+
+        button {
+            background: #1a6d7c;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-top: 15px;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            background: #0e4d63;
+            transform: scale(1.02);
+        }
+
+        .connection-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            margin-left: 10px;
+        }
+
+        .connected {
+            background: #10b981;
+            color: white;
+        }
+
+        .disconnected {
+            background: #ef4444;
+            color: white;
+        }
+
+        .tab-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .tab-btn {
+            flex: 1;
+            margin-top: 0;
+            background: #cbd5e1;
+            color: #0a3b47;
+        }
+
+        .tab-btn.active {
+            background: #1a6d7c;
+            color: white;
+        }
+
+        .chart-container {
+            display: none;
+        }
+
+        .chart-container.active {
+            display: block;
+        }
+
+        .warning-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            margin-top: 8px;
+        }
+
+        .range-near {
+            background: #fbbf24;
+            color: #78350f;
+        }
+
+        .range-far {
+            background: #10b981;
+            color: #064e3b;
+        }
+
+        @media (max-width: 700px) {
+            .sensor-grid {
+                grid-template-columns: 1fr;
+                gap: 15px;
+            }
+            .sensor-value {
+                font-size: 36px;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="card header">
+        <h1>📡 SP01 - Ultrasonic Water Controller</h1>
+        <p>Pompa Otomatis berdasarkan Jarak | Sensor HC-SR04</p>
+        <div style="margin-top: 10px;">
+            MQTT: <span id="mqttConnectionBadge" class="connection-badge disconnected">Menghubungkan...</span>
+            &nbsp; | Mode: <strong id="wifiModeDisplay">--</strong>
+        </div>
+    </div>
+
+    <div class="sensor-grid">
+        <div class="sensor-card">
+            <div class="sensor-icon">📏</div>
+            <div class="sensor-label">Jarak Terukur</div>
+            <div class="sensor-value">
+                <span id="jarakValue">--</span><span class="sensor-unit">cm</span>
+            </div>
+            <div class="info-row">
+                <span>🔴 &lt; 20 cm (Pompa OFF)</span>
+                <span>🟡 20-50 cm</span>
+                <span>🟢 &gt; 50 cm (Pompa ON)</span>
+            </div>
+        </div>
+
+        <div class="sensor-card">
+            <div class="sensor-icon">🎯</div>
+            <div class="sensor-label">Zona Deteksi</div>
+            <div class="sensor-value" style="font-size: 32px;">
+                <span id="zonaText">--</span>
+            </div>
+            <div class="info-row">
+                <span>Dekat &lt;20</span>
+                <span>Sedang 20-50</span>
+                <span>Jauh >50</span>
+            </div>
+        </div>
+
+        <div class="sensor-card">
+            <div class="sensor-icon">⏱️</div>
+            <div class="sensor-label">Status Sensor</div>
+            <div class="sensor-value" style="font-size: 28px;">
+                <span id="statusSensor">Active</span>
+            </div>
+            <div class="info-row">
+                <span>Update tiap 1 detik</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="status-card">
+            <div style="margin-bottom: 5px;">
+                <span class="status-indicator" id="statusLed"></span>
+                <span id="statusText">Menunggu data dari sensor...</span>
+            </div>
+            <div class="pump-status">
+                <div class="pump-led" id="pumpLed"></div>
+                <span style="font-weight: bold;">Pompa Air:</span>
+                <span id="pumpStateLabel">---</span>
+            </div>
+            <div style="margin-top: 10px;">
+                <span id="rangeWarning" class="warning-badge range-near">📏 Logika: Jarak < 20cm → Pompa OFF | Jarak > 50cm → Pompa ON</span>
+            </div>
+            <div style="font-size: 12px; color: #2c6e7e; margin-top: 12px;">
+                📡 Device: SP01_Client | Mode WiFi: <span id="wifiModeBadge">Offline</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="tab-buttons">
+            <button class="tab-btn active" onclick="switchChart('jarak')">📈 Grafik Jarak (cm)</button>
+            <button class="tab-btn" onclick="switchChart('pompa')">💧 Grafik Status Pompa</button>
+        </div>
+
+        <div id="jarakChartContainer" class="chart-container active">
+            <h3 style="margin-bottom: 10px;">📊 Riwayat Jarak (60 data terakhir)</h3>
+            <canvas id="jarakChart"></canvas>
+            <div style="font-size: 12px; color: #666; margin-top: 8px;">🟢 Hijau = Jarak >50cm (Pompa ON) | 🔴 Merah = Jarak &lt;20cm (Pompa OFF)</div>
+        </div>
+
+        <div id="pompaChartContainer" class="chart-container">
+            <h3 style="margin-bottom: 10px;">⚙️ Status Pompa (ON/OFF)</h3>
+            <canvas id="pompaChart"></canvas>
+            <div style="font-size: 12px; color: #666; margin-top: 8px;">Nilai 1 = Pompa MENYALA | Nilai 0 = Pompa MATI</div>
+        </div>
+
+        <button onclick="resetCharts()">🔄 Reset Semua Grafik</button>
+    </div>
+
+    <div class="card">
+        <div class="last-update" id="lastUpdate">
+            ⏱️ Terakhir update: ---
+        </div>
+        <div style="font-size: 11px; color: #6b7c64; text-align: center; margin-top: 10px;">
+            📡 MQTT Topics: SP01/jarak , SP01/pompa , SP01/status <br>
+            🌐 Broker: broker.hivemq.com | Mode WiFi: Tekan tombol D3 pada ESP untuk mengaktifkan WiFi
+        </div>
+    </div>
+</div>
+
+<script>
+    // ========= KONFIGURASI MQTT (Sesuai Arduino Ultrasonic) =========
+    const broker = "wss://broker.hivemq.com:8884/mqtt";
+    const topicJarak = "SP01/jarak";      // jarak dalam cm
+    const topicPompa = "SP01/pompa";       // ON / OFF
+    const topicStatus = "SP01/status";     // Online / Offline
+
+    // ========= DATA STORAGE =========
+    let jarakData = [];           // data jarak (cm)
+    let pompaBinaryData = [];     // 1 = ON, 0 = OFF
+    let timeLabels = [];
+    let jarakChart = null;
+    let pompaChart = null;
+
+    let lastJarak = 0;
+    let lastPompa = "OFF";
+    let currentWifiStatus = "Offline";
+    let lastZona = "--";
+
+    // ========= MQTT CLIENT =========
+    let client = null;
+
+    // ========= INISIALISASI CHART =========
+    function initCharts() {
+        // Chart Jarak
+        const ctxJarak = document.getElementById('jarakChart').getContext('2d');
+        jarakChart = new Chart(ctxJarak, {
+            type: 'line',
+            data: {
+                labels: timeLabels,
+                datasets: [{
+                    label: 'Jarak (cm)',
+                    data: jarakData,
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    borderWidth: 2.5,
+                    fill: true,
+                    tension: 0.2,
+                    pointRadius: 3,
+                    pointBackgroundColor: '#1e3a8a',
+                    pointBorderColor: '#fff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: 'Jarak (cm)' },
+                        grid: { color: 'rgba(0,0,0,0.05)' }
+                    },
+                    x: {
+                        title: { display: true, text: 'Waktu' },
+                        ticks: { maxRotation: 45, minRotation: 45 }
+                    }
+                },
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let jarakVal = context.raw;
+                                let statusPompa = jarakVal < 20 ? "Pompa OFF" : (jarakVal > 50 ? "Pompa ON" : "Pompa tetap");
+                                return `Jarak: ${jarakVal} cm | ${statusPompa}`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        // Chart Pompa (binary)
+        const ctxPompa = document.getElementById('pompaChart').getContext('2d');
+        pompaChart = new Chart(ctxPompa, {
+            type: 'line',
+            data: {
+                labels: timeLabels,
+                datasets: [{
+                    label: 'Status Pompa (1=ON, 0=OFF)',
+                    data: pompaBinaryData,
+                    borderColor: '#ef4444',
+                    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+                    borderWidth: 2,
+                    fill: true,
+                    stepped: true,
+                    pointRadius: 4,
+                    pointBackgroundColor: '#dc2626'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 1.2,
+                        min: -0.2,
+                        title: { display: true, text: 'Status (1=ON / 0=OFF)' },
+                        ticks: {
+                            stepSize: 1,
+                            callback: function(val) {
+                                if (val === 0) return 'OFF';
+                                if (val === 1) return 'ON';
+                                return '';
+                            }
+                        }
+                    },
+                    x: {
+                        title: { display: true, text: 'Waktu' }
+                    }
+                },
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return context.raw === 1 ? 'Pompa: MENYALA 💧' : 'Pompa: MATI ⏹️';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Update kedua grafik
+    function updateCharts(jarak, pompaState) {
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+        jarakData.push(jarak);
+        const binaryPompa = (pompaState === "ON") ? 1 : 0;
+        pompaBinaryData.push(binaryPompa);
+        timeLabels.push(timeStr);
+
+        const maxData = 60;
+        if (jarakData.length > maxData) {
+            jarakData.shift();
+            pompaBinaryData.shift();
+            timeLabels.shift();
+        }
+
+        if (jarakChart && pompaChart) {
+            jarakChart.data.datasets[0].data = [...jarakData];
+            jarakChart.data.labels = [...timeLabels];
+            jarakChart.update();
+
+            pompaChart.data.datasets[0].data = [...pompaBinaryData];
+            pompaChart.data.labels = [...timeLabels];
+            pompaChart.update();
+        }
+    }
+
+    // Tentukan zona berdasarkan jarak
+    function getZona(jarak) {
+        if (jarak < 20) return "🔴 DEKAT (<20cm)";
+        if (jarak <= 50) return "🟡 SEDANG (20-50cm)";
+        return "🟢 JAUH (>50cm)";
+    }
+
+    // Update tampilan UI
+    function updateDisplay(jarak, pompaState, wifiStat) {
+        document.getElementById('jarakValue').innerHTML = jarak;
+        
+        const zona = getZona(jarak);
+        document.getElementById('zonaText').innerHTML = zona;
+        lastZona = zona;
+
+        // Update Pompa UI
+        const pumpLed = document.getElementById('pumpLed');
+        const pumpLabel = document.getElementById('pumpStateLabel');
+        if (pompaState === "ON") {
+            pumpLed.className = "pump-led on";
+            pumpLabel.innerHTML = "💧 MENYALA (Mengisi Air)";
+        } else {
+            pumpLed.className = "pump-led off";
+            pumpLabel.innerHTML = "⏹️ MATI";
+        }
+
+        // Update status WiFi
+        const wifiModeSpan = document.getElementById('wifiModeBadge');
+        const wifiModeDisplay = document.getElementById('wifiModeDisplay');
+        if (wifiStat === "Online") {
+            wifiModeSpan.innerHTML = '<span style="color:#10b981;">Online ✅</span>';
+            wifiModeDisplay.innerHTML = "Online (MQTT Aktif)";
+        } else {
+            wifiModeSpan.innerHTML = '<span style="color:#ef4444;">Offline 🔌</span>';
+            wifiModeDisplay.innerHTML = "Offline (Tekan tombol D3)";
+        }
+
+        // Waktu update
+        const now = new Date();
+        document.getElementById('lastUpdate').innerHTML = `⏱️ Terakhir update: ${now.toLocaleDateString('id-ID')} ${now.toLocaleTimeString('id-ID')}`;
+
+        // Efek animasi card
+        const cards = document.querySelectorAll('.sensor-card');
+        cards.forEach(c => {
+            c.style.transform = 'scale(1.01)';
+            setTimeout(() => c.style.transform = 'scale(1)', 200);
+        });
+
+        // Update warna baris pada grafik jarak (hanya visual tooltip)
+        if (jarakChart) jarakChart.update();
+    }
+
+    // Update device status
+    function updateDeviceStatusOnline(wifiMode) {
+        const statusLed = document.getElementById('statusLed');
+        const statusText = document.getElementById('statusText');
+        if (wifiMode === "Online") {
+            statusLed.className = "status-indicator status-online";
+            statusText.innerHTML = "✅ ESP Terhubung ke WiFi & MQTT Broker";
+            currentWifiStatus = "Online";
+        } else {
+            statusLed.className = "status-indicator status-offline";
+            statusText.innerHTML = "⚠️ Mode OFFLINE (tanpa WiFi, hanya sensor & relay lokal)";
+            currentWifiStatus = "Offline";
+        }
+    }
+
+    // ================= MQTT CALLBACKS =================
+    function onConnectionLost(response) {
+        console.log("MQTT Connection Lost");
+        document.getElementById('mqttConnectionBadge').innerHTML = 'Terputus';
+        document.getElementById('mqttConnectionBadge').className = 'connection-badge disconnected';
+        setTimeout(() => connectMQTT(), 5000);
+    }
+
+    function onMessageArrived(message) {
+        const topic = message.destinationName;
+        const payload = message.payloadString.trim();
+
+        console.log(`MQTT << ${topic} : ${payload}`);
+
+        if (topic === topicJarak) {
+            let jarak = parseInt(payload);
+            if (!isNaN(jarak)) {
+                lastJarak = jarak;
+                // Update tampilan dengan data yang sudah ada (pompa mungkin masih lama)
+                updateDisplay(lastJarak, lastPompa, currentWifiStatus);
+                updateCharts(lastJarak, lastPompa);
+            }
+        }
+        else if (topic === topicPompa) {
+            lastPompa = payload;
+            const pumpLed = document.getElementById('pumpLed');
+            const pumpLabel = document.getElementById('pumpStateLabel');
+            if (lastPompa === "ON") {
+                pumpLed.className = "pump-led on";
+                pumpLabel.innerHTML = "💧 MENYALA";
+            } else {
+                pumpLed.className = "pump-led off";
+                pumpLabel.innerHTML = "⏹️ MATI";
+            }
+            if (lastJarak !== 0) {
+                updateDisplay(lastJarak, lastPompa, currentWifiStatus);
+                updateCharts(lastJarak, lastPompa);
+            }
+        }
+        else if (topic === topicStatus) {
+            currentWifiStatus = (payload === "Online" ? "Online" : "Offline");
+            updateDeviceStatusOnline(currentWifiStatus);
+            if (lastJarak !== 0) {
+                updateDisplay(lastJarak, lastPompa, currentWifiStatus);
+            }
+        }
+    }
+
+    function onConnect() {
+        console.log("MQTT Connected!");
+        document.getElementById('mqttConnectionBadge').innerHTML = 'Terhubung';
+        document.getElementById('mqttConnectionBadge').className = 'connection-badge connected';
+
+        client.subscribe(topicJarak);
+        client.subscribe(topicPompa);
+        client.subscribe(topicStatus);
+        console.log("Subscribe ke SP01/jarak, SP01/pompa, SP01/status");
+    }
+
+    function onFailure(err) {
+        console.error("MQTT Connection Failed:", err);
+        document.getElementById('mqttConnectionBadge').innerHTML = 'Gagal';
+        document.getElementById('mqttConnectionBadge').className = 'connection-badge disconnected';
+        setTimeout(() => connectMQTT(), 8000);
+    }
+
+    function connectMQTT() {
+        if (client && client.isConnected()) return;
+        const clientId = "web_sp01_ultrasonic_" + Math.random().toString(36).substr(2, 8);
+        client = new Paho.MQTT.Client(broker, clientId);
+        client.onConnectionLost = onConnectionLost;
+        client.onMessageArrived = onMessageArrived;
+        const options = {
+            timeout: 10,
+            useSSL: true,
+            keepAliveInterval: 30,
+            onSuccess: onConnect,
+            onFailure: onFailure
+        };
+        client.connect(options);
+    }
+
+    // Ganti chart
+    function switchChart(type) {
+        const jarakContainer = document.getElementById('jarakChartContainer');
+        const pompaContainer = document.getElementById('pompaChartContainer');
+        const btns = document.querySelectorAll('.tab-btn');
+        
+        if (type === 'jarak') {
+            jarakContainer.classList.add('active');
+            pompaContainer.classList.remove('active');
+            btns[0].classList.add('active');
+            btns[1].classList.remove('active');
+        } else {
+            pompaContainer.classList.add('active');
+            jarakContainer.classList.remove('active');
+            btns[1].classList.add('active');
+            btns[0].classList.remove('active');
+        }
+    }
+
+    function resetCharts() {
+        jarakData = [];
+        pompaBinaryData = [];
+        timeLabels = [];
+        if (jarakChart) {
+            jarakChart.data.datasets[0].data = [];
+            jarakChart.data.labels = [];
+            jarakChart.update();
+        }
+        if (pompaChart) {
+            pompaChart.data.datasets[0].data = [];
+            pompaChart.data.labels = [];
+            pompaChart.update();
+        }
+        if (lastJarak > 0) {
+            updateCharts(lastJarak, lastPompa);
+        }
+    }
+
+    // ========= INISIALISASI =========
+    initCharts();
+    connectMQTT();
+
+    // Auto reconnect setiap 30 detik
+    setInterval(() => {
+        if (client && !client.isConnected()) {
+            console.log("Reconnecting MQTT...");
+            connectMQTT();
+        }
+    }, 30000);
+</script>
+</body>
+</html>
