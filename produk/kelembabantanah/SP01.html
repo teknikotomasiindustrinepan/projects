@@ -2,8 +2,8 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Soil Moisture Monitor - SP01</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>SP01 - Soil Moisture + Pompa Otomatis | Monitoring Lahan</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
     <style>
@@ -15,7 +15,7 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #2d5016 0%, #4a8b1f 100%);
+            background: linear-gradient(135deg, #2b5e3b 0%, #1e3a2f 100%);
             min-height: 100vh;
             padding: 20px;
         }
@@ -28,156 +28,164 @@
         .card {
             background: white;
             border-radius: 20px;
-            padding: 20px;
+            padding: 25px;
             margin-bottom: 20px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            transition: transform 0.3s;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
         }
 
         .header {
             text-align: center;
-            background: linear-gradient(135deg, #1a3a0a 0%, #2d6a0e 100%);
-            color: white;
+            margin-bottom: 20px;
         }
 
         .header h1 {
-            font-size: 24px;
-            margin-bottom: 8px;
+            color: #1f3b2c;
+            font-size: 28px;
+            margin-bottom: 10px;
         }
 
         .header p {
-            font-size: 12px;
-            opacity: 0.9;
+            color: #2d5a3b;
+            font-size: 14px;
         }
 
-        .value-card {
+        .sensor-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .sensor-card {
             text-align: center;
-            background: linear-gradient(135deg, #2d5016 0%, #3a7a12 100%);
+            background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%);
             color: white;
+            border-radius: 15px;
+            padding: 20px;
+            transition: all 0.3s;
         }
 
-        .moisture-value {
-            font-size: 72px;
-            font-weight: bold;
-            margin: 15px 0;
+        .sensor-icon {
+            font-size: 42px;
+            margin-bottom: 10px;
         }
 
-        .moisture-label {
+        .sensor-label {
             font-size: 14px;
             opacity: 0.9;
+            margin-bottom: 10px;
         }
 
-        .unit {
-            font-size: 20px;
+        .sensor-value {
+            font-size: 38px;
+            font-weight: bold;
+            margin: 10px 0;
         }
 
-        .progress-bar {
-            width: 100%;
-            height: 25px;
-            background: rgba(255,255,255,0.3);
-            border-radius: 15px;
-            overflow: hidden;
-            margin-top: 15px;
-        }
-
-        .progress-fill {
-            height: 100%;
-            transition: width 0.3s ease;
-            background: #ffd700;
-            border-radius: 15px;
+        .sensor-unit {
+            font-size: 18px;
         }
 
         .info-row {
             display: flex;
             justify-content: space-between;
-            margin-top: 20px;
-            font-size: 13px;
+            margin-top: 12px;
+            font-size: 11px;
+            opacity: 0.9;
         }
 
         .status-card {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 15px;
+            background: #f1f8e9;
+            border-radius: 15px;
+            padding: 15px;
             text-align: center;
         }
 
-        .status-item {
-            background: #f3f4f6;
-            padding: 12px;
-            border-radius: 15px;
+        .pump-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            background: #fff;
+            border-radius: 40px;
+            padding: 8px 24px;
+            margin: 10px 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
 
-        .status-label {
-            font-size: 12px;
-            color: #666;
-            margin-bottom: 8px;
+        .pump-led {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: gray;
+            box-shadow: 0 0 5px rgba(0,0,0,0.2);
         }
 
-        .status-value {
-            font-size: 20px;
-            font-weight: bold;
+        .pump-led.on {
+            background: #00e676;
+            box-shadow: 0 0 12px #00e676;
         }
 
-        .status-wet {
-            background: #10b981;
-            color: white;
+        .pump-led.off {
+            background: #9e9e9e;
         }
 
-        .status-dry {
-            background: #f59e0b;
-            color: white;
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
         }
 
-        .status-very-dry {
-            background: #ef4444;
-            color: white;
-        }
-
-        .status-offline {
-            background: #9ca3af;
-            color: white;
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
         }
 
         .status-online {
-            background: #10b981;
-            color: white;
+            background-color: #10b981;
+            box-shadow: 0 0 5px #10b981;
         }
 
-        .pump-on {
-            background: #10b981;
-            color: white;
-        }
-
-        .pump-off {
-            background: #6b7280;
-            color: white;
+        .status-offline {
+            background-color: #ef4444;
+            box-shadow: 0 0 5px #ef4444;
         }
 
         .last-update {
-            font-size: 11px;
-            color: #666;
+            font-size: 12px;
+            color: #3e5a3a;
             margin-top: 15px;
             text-align: center;
         }
 
         canvas {
-            max-height: 280px;
+            max-height: 320px;
             width: 100%;
+            margin-top: 15px;
         }
 
         button {
-            background: #3b82f6;
+            background: #2e7d32;
             color: white;
             border: none;
-            padding: 8px 20px;
+            padding: 10px 20px;
             border-radius: 10px;
             cursor: pointer;
-            font-size: 12px;
-            margin-top: 10px;
+            font-size: 14px;
+            margin-top: 15px;
             transition: all 0.3s;
         }
 
         button:hover {
-            background: #2563eb;
+            background: #1b5e20;
             transform: scale(1.02);
         }
 
@@ -199,407 +207,472 @@
             color: white;
         }
 
-        .sensor-badge {
-            display: inline-block;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 11px;
-            margin-top: 8px;
-        }
-
-        .flex-between {
+        .tab-buttons {
             display: flex;
-            justify-content: space-between;
-            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
         }
 
-        .title-icon {
-            font-size: 28px;
-            vertical-align: middle;
+        .tab-btn {
+            flex: 1;
+            margin-top: 0;
+            background: #e0e7e0;
+            color: #1f3b2c;
         }
 
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.6; }
-            100% { opacity: 1; }
+        .tab-btn.active {
+            background: #2e7d32;
+            color: white;
         }
 
-        .pulse {
-            animation: pulse 1.5s ease-in-out infinite;
+        .chart-container {
+            display: none;
+        }
+
+        .chart-container.active {
+            display: block;
+        }
+
+        @media (max-width: 700px) {
+            .sensor-grid {
+                grid-template-columns: 1fr;
+                gap: 15px;
+            }
+            .sensor-value {
+                font-size: 32px;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="card header">
-            <h1>
-                <span class="title-icon">🌱</span> 
-                Soil Moisture Monitor - SP01
-            </h1>
-            <p>Real-time Kelembaban Tanah | Smart Plant Monitoring</p>
-            <div class="flex-between" style="margin-top: 12px; justify-content: center;">
-                <div>
-                    MQTT: <span id="mqttConnectionBadge" class="connection-badge disconnected">Menghubungkan...</span>
-                </div>
-            </div>
+<div class="container">
+    <div class="card header">
+        <h1>🌱 SP01 - Smart Soil Moisture</h1>
+        <p>Pompa otomatis + Monitoring Kelembaban Tanah</p>
+        <div style="margin-top: 10px;">
+            MQTT: <span id="mqttConnectionBadge" class="connection-badge disconnected">Menghubungkan...</span>
+            &nbsp; | Mode: <strong id="wifiModeDisplay">--</strong>
         </div>
+    </div>
 
-        <div class="card value-card">
-            <div class="moisture-label">🌍 Kelembaban Tanah</div>
-            <div class="moisture-value">
-                <span id="moistureValue">---</span><span class="unit"></span>
-            </div>
-            <div class="progress-bar">
-                <div class="progress-fill" id="progressFill" style="width: 0%;"></div>
+    <div class="sensor-grid">
+        <div class="sensor-card">
+            <div class="sensor-icon">💧</div>
+            <div class="sensor-label">Kelembaban Tanah</div>
+            <div class="sensor-value">
+                <span id="soilValue">--</span><span class="sensor-unit">%</span>
             </div>
             <div class="info-row">
-                <span>💧 Basah (0-30%)</span>
+                <span>🏜️ Kering (&lt;30%)</span>
                 <span>🌿 Lembab (30-70%)</span>
-                <span>🌵 Kering (>70%)</span>
+                <span>💧 Basah (&gt;70%)</span>
             </div>
         </div>
 
-        <div class="card">
-            <div class="status-card">
-                <div class="status-item">
-                    <div class="status-label">📊 Kondisi Tanah</div>
-                    <div class="status-value" id="kondisiText">---</div>
-                </div>
-                <div class="status-item">
-                    <div class="status-label">💧 Nilai Sensor</div>
-                    <div class="status-value" id="nilaiSensor">---</div>
-                </div>
-                <div class="status-item">
-                    <div class="status-label">🚰 Pompa</div>
-                    <div class="status-value" id="pompaStatus">---</div>
-                </div>
-                <div class="status-item">
-                    <div class="status-label">📡 NodeMCU</div>
-                    <div class="status-value" id="wifiStatus">---</div>
-                </div>
+        <div class="sensor-card">
+            <div class="sensor-icon">💦</div>
+            <div class="sensor-label">Kondisi Tanah</div>
+            <div class="sensor-value" style="font-size: 30px;">
+                <span id="kondisiText">--</span>
+            </div>
+            <div class="info-row">
+                <span>🚰 Pompa menyala jika KERING</span>
             </div>
         </div>
 
-        <div class="card">
-            <h3 style="margin-bottom: 15px;">📈 Grafik Kelembaban (60 data terakhir)</h3>
-            <canvas id="moistureChart"></canvas>
-            <div style="text-align: center; margin-top: 12px;">
-                <button onclick="resetChart()">🔄 Reset Grafik</button>
+        <div class="sensor-card">
+            <div class="sensor-icon">⚙️</div>
+            <div class="sensor-label">Nilai Sensor Mentah</div>
+            <div class="sensor-value" style="font-size: 32px;">
+                <span id="rawValue">--</span>
             </div>
-        </div>
-
-        <div class="card">
-            <div class="last-update" id="lastUpdate">
-                Terakhir update: ---
-            </div>
-            <div style="font-size: 11px; color: #999; text-align: center; margin-top: 10px;">
-                📡 MQTT Server: broker.hivemq.com<br>
-                📨 Topics: SP01/soil | SP01/kondisi | SP01/pompa | SP01/status
+            <div class="info-row">
+                <span>0 (basah) → 1023 (kering)</span>
             </div>
         </div>
     </div>
 
-    <script>
-        // Konfigurasi MQTT
-        const broker = "wss://broker.hivemq.com:8884/mqtt";
-        const topics = ["SP01/soil", "SP01/kondisi", "SP01/pompa", "SP01/status"];
-        
-        // Data untuk grafik (max 60 data points)
-        let moistureData = [];
-        let timeLabels = [];
-        let chart = null;
-        let lastValue = 0;
-        
-        // Data terakhir dari berbagai topic
-        let lastSoilValue = null;
-        let lastKondisi = "";
-        let lastPompa = "";
-        let lastStatus = "";
-        
-        // MQTT Client
-        let client = null;
-        
-        // Inisialisasi Chart
-        function initChart() {
-            const ctx = document.getElementById('moistureChart').getContext('2d');
-            chart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: timeLabels,
-                    datasets: [{
-                        label: 'Nilai Sensor Kelembaban',
-                        data: moistureData,
-                        borderColor: 'rgb(34, 197, 94)',
-                        backgroundColor: 'rgba(34, 197, 94, 0.1)',
-                        borderWidth: 2.5,
-                        fill: true,
-                        tension: 0.3,
-                        pointRadius: 3.5,
-                        pointBackgroundColor: 'rgb(34, 197, 94)',
-                        pointBorderColor: 'white',
-                        pointBorderWidth: 1.5
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: true,
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            max: 1024,
-                            title: {
-                                display: true,
-                                text: 'Nilai Sensor (0-1024)',
-                                font: { size: 12 }
-                            },
-                            grid: {
-                                color: 'rgba(0,0,0,0.05)'
-                            }
-                        },
-                        x: {
-                            title: {
-                                display: true,
-                                text: 'Waktu',
-                                font: { size: 12 }
-                            },
-                            ticks: {
-                                maxRotation: 45,
-                                minRotation: 45,
-                                font: { size: 9 }
-                            }
-                        }
+    <div class="card">
+        <div class="status-card">
+            <div style="margin-bottom: 5px;">
+                <span class="status-indicator" id="statusLed"></span>
+                <span id="statusText">Menunggu data...</span>
+            </div>
+            <div class="pump-status">
+                <div class="pump-led" id="pumpLed"></div>
+                <span style="font-weight: bold;">Pompa:</span>
+                <span id="pumpStateLabel">---</span>
+            </div>
+            <div style="font-size: 12px; color: #3c5e3a; margin-top: 8px;">
+                📡 Device: SP01_Client | Mode WiFi: <span id="wifiModeBadge">Offline</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="tab-buttons">
+            <button class="tab-btn active" onclick="switchChart('soil')">🌾 Grafik Kelembaban</button>
+            <button class="tab-btn" onclick="switchChart('raw')">📊 Grafik Nilai Mentah</button>
+        </div>
+
+        <div id="soilChartContainer" class="chart-container active">
+            <h3 style="margin-bottom: 10px;">📈 Kelembaban Tanah (%) - 60 data terakhir</h3>
+            <canvas id="soilMoistureChart"></canvas>
+        </div>
+
+        <div id="rawChartContainer" class="chart-container">
+            <h3 style="margin-bottom: 10px;">📉 Nilai ADC Sensor (0-1023) </h3>
+            <canvas id="rawAdcChart"></canvas>
+        </div>
+
+        <button onclick="resetCharts()">🔄 Reset Semua Grafik</button>
+    </div>
+
+    <div class="card">
+        <div class="last-update" id="lastUpdate">
+            ⏱️ Terakhir update: ---
+        </div>
+        <div style="font-size: 11px; color: #6b7c64; text-align: center; margin-top: 10px;">
+            📡 Topics: SP01/soil , SP01/kondisi , SP01/pompa , SP01/status <br>
+            🌐 MQTT Server: broker.hivemq.com | Mode WiFi: tombol tekan pada ESP
+        </div>
+    </div>
+</div>
+
+<script>
+    // ========= KONFIGURASI MQTT (Sesuai Arduino) =========
+    const broker = "wss://broker.hivemq.com:8884/mqtt";
+    const topicSoil = "SP01/soil";         // nilai mentah (ADC)
+    const topicKondisi = "SP01/kondisi";    // Kering / Lembab / Basah
+    const topicPompa = "SP01/pompa";        // ON / OFF
+    const topicStatus = "SP01/status";      // Online / Offline (mode WiFi)
+
+    // ========= DATA STORAGE =========
+    let soilPercentData = [];      // persen kelembaban
+    let rawAdcData = [];           // nilai ADC mentah
+    let timeLabels = [];
+    let soilChart = null;
+    let rawChart = null;
+
+    let lastSoilPercent = 0;
+    let lastRawValue = 0;
+    let lastKondisi = "--";
+    let lastPompa = "OFF";
+    let currentWifiStatus = "Offline";
+
+    // ========= MQTT CLIENT =========
+    let client = null;
+
+    // ========= INISIALISASI CHART =========
+    function initCharts() {
+        // Chart Kelembaban (%)
+        const ctxSoil = document.getElementById('soilMoistureChart').getContext('2d');
+        soilChart = new Chart(ctxSoil, {
+            type: 'line',
+            data: {
+                labels: timeLabels,
+                datasets: [{
+                    label: 'Kelembaban Tanah (%)',
+                    data: soilPercentData,
+                    borderColor: '#2b8c4a',
+                    backgroundColor: 'rgba(43, 140, 74, 0.1)',
+                    borderWidth: 2.5,
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 3,
+                    pointBackgroundColor: '#1f5e36'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        title: { display: true, text: 'Kelembaban (%)' }
                     },
-                    plugins: {
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    return `Nilai: ${context.raw}`;
-                                }
-                            }
-                        },
-                        legend: {
-                            position: 'top',
-                            labels: { font: { size: 11 } }
-                        }
+                    x: {
+                        title: { display: true, text: 'Waktu' },
+                        ticks: { maxRotation: 45, minRotation: 45 }
                     }
                 }
-            });
-        }
-        
-        // Update grafik dengan data baru
-        function updateChart(value) {
-            const now = new Date();
-            const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-            
-            moistureData.push(value);
-            timeLabels.push(timeStr);
-            
-            if (moistureData.length > 60) {
-                moistureData.shift();
-                timeLabels.shift();
             }
-            
-            if (chart) {
-                chart.data.datasets[0].data = moistureData;
-                chart.data.labels = timeLabels;
-                chart.update();
-            }
-        }
-        
-        // Hitung persen dari nilai sensor (0-1024 ke 0-100)
-        function nilaiKePersen(nilai) {
-            // map(nilai, 1023, 300, 0, 100) dari kode Arduino
-            let persen = Math.round(((nilai - 300) / (1023 - 300)) * 100);
-            persen = Math.min(100, Math.max(0, persen));
-            return persen;
-        }
-        
-        // Update status card berdasarkan data
-        function updateStatusCard() {
-            // Update kondisi tanah
-            const kondisiElem = document.getElementById('kondisiText');
-            if (lastKondisi) {
-                kondisiElem.innerHTML = lastKondisi;
-                if (lastKondisi === "Kering") {
-                    kondisiElem.className = "status-value status-very-dry";
-                } else if (lastKondisi === "Lembab") {
-                    kondisiElem.className = "status-value status-dry";
-                } else if (lastKondisi === "Basah") {
-                    kondisiElem.className = "status-value status-wet";
+        });
+
+        // Chart Nilai Mentah (ADC)
+        const ctxRaw = document.getElementById('rawAdcChart').getContext('2d');
+        rawChart = new Chart(ctxRaw, {
+            type: 'line',
+            data: {
+                labels: timeLabels,
+                datasets: [{
+                    label: 'Nilai Sensor (ADC)',
+                    data: rawAdcData,
+                    borderColor: '#ff8c42',
+                    backgroundColor: 'rgba(255, 140, 66, 0.1)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.2,
+                    pointRadius: 2,
+                    pointBackgroundColor: '#d95b1a'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 1023,
+                        title: { display: true, text: 'ADC (0-1023)' }
+                    },
+                    x: {
+                        title: { display: true, text: 'Waktu' }
+                    }
                 }
             }
-            
-            // Update nilai sensor
-            const nilaiElem = document.getElementById('nilaiSensor');
-            if (lastSoilValue !== null) {
-                nilaiElem.innerHTML = lastSoilValue;
-            }
-            
-            // Update pompa
-            const pompaElem = document.getElementById('pompaStatus');
-            if (lastPompa) {
-                pompaElem.innerHTML = lastPompa;
-                if (lastPompa === "ON") {
-                    pompaElem.className = "status-value pump-on";
-                } else {
-                    pompaElem.className = "status-value pump-off";
-                }
-            }
-            
-            // Update WiFi status
-            const wifiElem = document.getElementById('wifiStatus');
-            if (lastStatus) {
-                wifiElem.innerHTML = lastStatus;
-                if (lastStatus === "Online") {
-                    wifiElem.className = "status-value status-online";
-                } else {
-                    wifiElem.className = "status-value status-offline";
+        });
+    }
+
+    // Update kedua grafik
+    function updateCharts(percent, rawAdc) {
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+        soilPercentData.push(percent);
+        rawAdcData.push(rawAdc);
+        timeLabels.push(timeStr);
+
+        const maxData = 60;
+        if (soilPercentData.length > maxData) {
+            soilPercentData.shift();
+            rawAdcData.shift();
+            timeLabels.shift();
+        }
+
+        if (soilChart && rawChart) {
+            soilChart.data.datasets[0].data = [...soilPercentData];
+            soilChart.data.labels = [...timeLabels];
+            soilChart.update();
+
+            rawChart.data.datasets[0].data = [...rawAdcData];
+            rawChart.data.labels = [...timeLabels];
+            rawChart.update();
+        }
+    }
+
+    // Update tampilan UI berdasarkan data MQTT
+    function updateDisplay(soilPercent, rawValue, kondisi, pompaState, wifiStat) {
+        document.getElementById('soilValue').innerHTML = Math.round(soilPercent);
+        document.getElementById('rawValue').innerHTML = rawValue;
+        document.getElementById('kondisiText').innerHTML = kondisi;
+
+        // Pompa Indicator
+        const pumpLed = document.getElementById('pumpLed');
+        const pumpLabel = document.getElementById('pumpStateLabel');
+        if (pompaState === "ON") {
+            pumpLed.className = "pump-led on";
+            pumpLabel.innerHTML = "💧 MENYALA";
+        } else {
+            pumpLed.className = "pump-led off";
+            pumpLabel.innerHTML = "⏹️ MATI";
+        }
+
+        // Status WiFi 
+        const wifiModeSpan = document.getElementById('wifiModeBadge');
+        const wifiModeDisplay = document.getElementById('wifiModeDisplay');
+        if (wifiStat === "Online") {
+            wifiModeSpan.innerHTML = '<span style="color:#10b981;">Online ✅</span>';
+            wifiModeDisplay.innerHTML = "Online";
+        } else {
+            wifiModeSpan.innerHTML = '<span style="color:#ef4444;">Offline 🔌</span>';
+            wifiModeDisplay.innerHTML = "Offline (tombol untuk WiFi)";
+        }
+
+        // Update waktu terakhir
+        const now = new Date();
+        document.getElementById('lastUpdate').innerHTML = `⏱️ Terakhir update: ${now.toLocaleDateString('id-ID')} ${now.toLocaleTimeString('id-ID')}`;
+
+        // Animasi kecil
+        const cards = document.querySelectorAll('.sensor-card');
+        cards.forEach(c => {
+            c.style.transform = 'scale(1.01)';
+            setTimeout(() => c.style.transform = 'scale(1)', 200);
+        });
+    }
+
+    // Update device status (Online / Offline)
+    function updateDeviceStatusOnline(wifiMode) {
+        const statusLed = document.getElementById('statusLed');
+        const statusText = document.getElementById('statusText');
+        if (wifiMode === "Online") {
+            statusLed.className = "status-indicator status-online";
+            statusText.innerHTML = "✅ ESP Terhubung ke WiFi & MQTT";
+            currentWifiStatus = "Online";
+        } else {
+            statusLed.className = "status-indicator status-offline";
+            statusText.innerHTML = "⚠️ Mode OFFLINE (tanpa WiFi/MQTT)";
+            currentWifiStatus = "Offline";
+        }
+        document.getElementById('wifiModeBadge').innerHTML = currentWifiStatus === "Online" ? 
+            '<span style="color:#10b981;">Online ✅</span>' : '<span style="color:#ef4444;">Offline 🔌</span>';
+        document.getElementById('wifiModeDisplay').innerHTML = currentWifiStatus;
+    }
+
+    // ================= MQTT CALLBACKS =================
+    function onConnectionLost(response) {
+        console.log("MQTT lost connection");
+        document.getElementById('mqttConnectionBadge').innerHTML = 'Terputus';
+        document.getElementById('mqttConnectionBadge').className = 'connection-badge disconnected';
+        setTimeout(() => connectMQTT(), 6000);
+    }
+
+    function onMessageArrived(message) {
+        const topic = message.destinationName;
+        const payload = message.payloadString.trim();
+
+        console.log(`MQTT << ${topic} : ${payload}`);
+
+        // Update nilai-nilai berdasarkan topik
+        if (topic === topicSoil) {
+            let rawVal = parseInt(payload);
+            if (!isNaN(rawVal)) {
+                lastRawValue = rawVal;
+                // Konversi ke persen sesuai rumus di Arduino: map(1023,300,0,100)
+                let persen = mapRange(rawVal, 1023, 300, 0, 100);
+                persen = Math.min(100, Math.max(0, persen));
+                lastSoilPercent = persen;
+
+                // Tampilkan update sementara (bisa masih nunggu topic kondisi & pompa)
+                document.getElementById('soilValue').innerHTML = Math.round(lastSoilPercent);
+                document.getElementById('rawValue').innerHTML = lastRawValue;
+                // Update grafik kalau sudah punya kondisi + pompa juga boleh terlambat sedikit
+                if (lastKondisi !== "--") {
+                    updateCharts(lastSoilPercent, lastRawValue);
+                    updateDisplay(lastSoilPercent, lastRawValue, lastKondisi, lastPompa, currentWifiStatus);
                 }
             }
         }
-        
-        // Update tampilan utama (nilai sensor)
-        function updateDisplay(value) {
-            const numValue = parseInt(value);
-            if (isNaN(numValue)) return;
-            
-            lastSoilValue = numValue;
-            lastValue = numValue;
-            
-            // Update angka besar
-            document.getElementById('moistureValue').innerHTML = numValue;
-            
-            // Hitung persentase dan update progress bar
-            const persen = nilaiKePersen(numValue);
-            document.getElementById('progressFill').style.width = persen + '%';
-            
-            // Update warna progress bar dan status text
-            const progressFill = document.getElementById('progressFill');
-            const statusText = document.getElementById('statusText');
-            
-            if (persen > 70) {
-                progressFill.style.background = '#ef4444';
-                statusText.innerHTML = '🌵 KERING - Perlu Penyiraman Segera!';
-                statusText.className = 'status status-very-dry';
-            } else if (persen > 30) {
-                progressFill.style.background = '#f59e0b';
-                statusText.innerHTML = '🌿 LEMBAB - Kondisi Baik';
-                statusText.className = 'status status-dry';
+        else if (topic === topicKondisi) {
+            lastKondisi = payload;
+            if (lastSoilPercent !== 0) {
+                updateDisplay(lastSoilPercent, lastRawValue, lastKondisi, lastPompa, currentWifiStatus);
+                updateCharts(lastSoilPercent, lastRawValue);
             } else {
-                progressFill.style.background = '#10b981';
-                statusText.innerHTML = '💧 BASAH - Kelembaban Tinggi';
-                statusText.className = 'status status-wet';
-            }
-            
-            // Update waktu
-            const now = new Date();
-            document.getElementById('lastUpdate').innerHTML = `Terakhir update: ${now.toLocaleTimeString('id-ID')} | Nilai: ${numValue} | Kelembaban: ${persen}%`;
-            
-            // Update grafik
-            updateChart(numValue);
-        }
-        
-        // MQTT Connection Lost
-        function onConnectionLost(response) {
-            console.log("MQTT Connection Lost");
-            document.getElementById('mqttConnectionBadge').innerHTML = 'Terputus';
-            document.getElementById('mqttConnectionBadge').className = 'connection-badge disconnected';
-            
-            setTimeout(() => {
-                connectMQTT();
-            }, 5000);
-        }
-        
-        // MQTT Message Arrived
-        function onMessageArrived(message) {
-            const topic = message.destinationName;
-            const payload = message.payloadString;
-            console.log("Data diterima - Topic:", topic, "| Payload:", payload);
-            
-            // Proses berdasarkan topic
-            if (topic === "SP01/soil") {
-                updateDisplay(payload);
-            } else if (topic === "SP01/kondisi") {
-                lastKondisi = payload;
-                updateStatusCard();
-            } else if (topic === "SP01/pompa") {
-                lastPompa = payload;
-                updateStatusCard();
-            } else if (topic === "SP01/status") {
-                lastStatus = payload;
-                updateStatusCard();
+                document.getElementById('kondisiText').innerHTML = lastKondisi;
             }
         }
-        
-        // MQTT Connect Success
-        function onConnect() {
-            console.log("MQTT Connected!");
-            document.getElementById('mqttConnectionBadge').innerHTML = 'Terhubung';
-            document.getElementById('mqttConnectionBadge').className = 'connection-badge connected';
-            
-            // Subscribe ke semua topics
-            for (let i = 0; i < topics.length; i++) {
-                client.subscribe(topics[i]);
-                console.log("Subscribe ke topic:", topics[i]);
-            }
-        }
-        
-        // MQTT Connect Failed
-        function onFailure(err) {
-            console.error("MQTT Connection Failed:", err);
-            document.getElementById('mqttConnectionBadge').innerHTML = 'Gagal konek';
-            document.getElementById('mqttConnectionBadge').className = 'connection-badge disconnected';
-            
-            setTimeout(() => {
-                connectMQTT();
-            }, 10000);
-        }
-        
-        // Connect ke MQTT
-        function connectMQTT() {
-            if (client && client.isConnected()) {
-                return;
-            }
-            
-            const clientId = "web_dashboard_" + Math.random().toString(36).substr(2, 8);
-            client = new Paho.MQTT.Client(broker, clientId);
-            
-            client.onConnectionLost = onConnectionLost;
-            client.onMessageArrived = onMessageArrived;
-            
-            const options = {
-                timeout: 15,
-                useSSL: true,
-                keepAliveInterval: 30,
-                cleanSession: true,
-                onSuccess: onConnect,
-                onFailure: onFailure
-            };
-            
-            client.connect(options);
-        }
-        
-        // Reset grafik
-        function resetChart() {
-            moistureData = [];
-            timeLabels = [];
-            if (lastValue > 0) {
-                updateChart(lastValue);
+        else if (topic === topicPompa) {
+            lastPompa = payload;
+            const pumpLed = document.getElementById('pumpLed');
+            const pumpLabel = document.getElementById('pumpStateLabel');
+            if (lastPompa === "ON") {
+                pumpLed.className = "pump-led on";
+                pumpLabel.innerHTML = "💧 MENYALA";
             } else {
-                if (chart) {
-                    chart.data.datasets[0].data = [];
-                    chart.data.labels = [];
-                    chart.update();
-                }
+                pumpLed.className = "pump-led off";
+                pumpLabel.innerHTML = "⏹️ MATI";
+            }
+            if (lastSoilPercent !== 0) updateDisplay(lastSoilPercent, lastRawValue, lastKondisi, lastPompa, currentWifiStatus);
+        }
+        else if (topic === topicStatus) {
+            currentWifiStatus = (payload === "Online" ? "Online" : "Offline");
+            updateDeviceStatusOnline(currentWifiStatus);
+            if (lastSoilPercent !== 0) {
+                updateDisplay(lastSoilPercent, lastRawValue, lastKondisi, lastPompa, currentWifiStatus);
             }
         }
-        
-        // Inisialisasi
-        initChart();
-        connectMQTT();
-        
-        // Update status card awal
-        updateStatusCard();
-    </script>
+    }
+
+    function onConnect() {
+        console.log("MQTT Terhubung!");
+        document.getElementById('mqttConnectionBadge').innerHTML = 'Terhubung';
+        document.getElementById('mqttConnectionBadge').className = 'connection-badge connected';
+
+        client.subscribe(topicSoil);
+        client.subscribe(topicKondisi);
+        client.subscribe(topicPompa);
+        client.subscribe(topicStatus);
+        console.log("Subscribe ke SP01/#");
+    }
+
+    function onFailure(err) {
+        console.error("MQTT gagal konek:", err);
+        document.getElementById('mqttConnectionBadge').innerHTML = 'Gagal';
+        document.getElementById('mqttConnectionBadge').className = 'connection-badge disconnected';
+        setTimeout(() => connectMQTT(), 8000);
+    }
+
+    // Fungsi untuk mapping seperti Arduino map()
+    function mapRange(x, in_min, in_max, out_min, out_max) {
+        return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+    }
+
+    function connectMQTT() {
+        if (client && client.isConnected()) return;
+        const clientId = "web_sp01_" + Math.random().toString(36).substr(2, 8);
+        client = new Paho.MQTT.Client(broker, clientId);
+        client.onConnectionLost = onConnectionLost;
+        client.onMessageArrived = onMessageArrived;
+        const options = {
+            timeout: 10,
+            useSSL: true,
+            keepAliveInterval: 30,
+            onSuccess: onConnect,
+            onFailure: onFailure
+        };
+        client.connect(options);
+    }
+
+    // Switch antar grafik
+    function switchChart(type) {
+        const soilContainer = document.getElementById('soilChartContainer');
+        const rawContainer = document.getElementById('rawChartContainer');
+        const btns = document.querySelectorAll('.tab-btn');
+        if (type === 'soil') {
+            soilContainer.classList.add('active');
+            rawContainer.classList.remove('active');
+            btns[0].classList.add('active');
+            btns[1].classList.remove('active');
+        } else {
+            rawContainer.classList.add('active');
+            soilContainer.classList.remove('active');
+            btns[1].classList.add('active');
+            btns[0].classList.remove('active');
+        }
+    }
+
+    function resetCharts() {
+        soilPercentData = [];
+        rawAdcData = [];
+        timeLabels = [];
+        if (soilChart) {
+            soilChart.data.datasets[0].data = [];
+            soilChart.data.labels = [];
+            soilChart.update();
+        }
+        if (rawChart) {
+            rawChart.data.datasets[0].data = [];
+            rawChart.data.labels = [];
+            rawChart.update();
+        }
+        // jika ada data terakhir, masukkan lagi agar grafik tidak kosong
+        if (lastSoilPercent > 0 && lastRawValue > 0) {
+            updateCharts(lastSoilPercent, lastRawValue);
+        }
+    }
+
+    // ========= INISIALISASI =========
+    initCharts();
+    connectMQTT();
+
+    setInterval(() => {
+        if (client && !client.isConnected()) {
+            console.log("Coba reconnect MQTT...");
+            connectMQTT();
+        }
+    }, 35000);
+</script>
 </body>
 </html>
