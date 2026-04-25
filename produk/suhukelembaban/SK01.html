@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>SK01 - Monitoring Suhu & Kelembaban</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 28px;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .sensor-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .sensor-card {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            transition: transform 0.3s;
+        }
+
+        .sensor-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .sensor-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+
+        .sensor-label {
+            font-size: 14px;
+            color: #555;
+            margin-bottom: 5px;
+        }
+
+        .sensor-value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .sensor-unit {
+            font-size: 16px;
+            color: #666;
+        }
+
+        .status-card {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 15px;
+            text-align: center;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-online {
+            background-color: #4caf50;
+            box-shadow: 0 0 5px #4caf50;
+        }
+
+        .status-offline {
+            background-color: #f44336;
+            box-shadow: 0 0 5px #f44336;
+        }
+
+        .last-update {
+            font-size: 12px;
+            color: #999;
+            margin-top: 15px;
+            text-align: center;
+        }
+
+        .footer {
+            text-align: center;
+            color: white;
+            font-size: 12px;
+            margin-top: 20px;
+        }
+
+        .btn-refresh {
+            background: rgba(255,255,255,0.2);
+            border: 1px solid white;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .btn-refresh:hover {
+            background: white;
+            color: #667eea;
+        }
+
+        @media (max-width: 480px) {
+            .sensor-value {
+                font-size: 24px;
+            }
+            .sensor-icon {
+                font-size: 36px;
+            }
+        }
+    </style>
+    <!-- MQTT Library -->
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <div class="header">
+                <h1>🌡️ SK01 Monitoring</h1>
+                <p>Sistem Pemantauan Suhu & Kelembaban</p>
+            </div>
+
+            <div class="sensor-grid">
+                <div class="sensor-card">
+                    <div class="sensor-icon">🌡️</div>
+                    <div class="sensor-label">Suhu</div>
+                    <div class="sensor-value">
+                        <span id="suhu">--</span>
+                        <span class="sensor-unit">°C</span>
+                    </div>
+                </div>
+
+                <div class="sensor-card">
+                    <div class="sensor-icon">💧</div>
+                    <div class="sensor-label">Kelembaban</div>
+                    <div class="sensor-value">
+                        <span id="hum">--</span>
+                        <span class="sensor-unit">%</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="status-card">
+                <div style="margin-bottom: 10px;">
+                    <span class="status-indicator" id="statusLed"></span>
+                    <span id="statusText">Menghubungkan ke MQTT...</span>
+                </div>
+                <div style="font-size: 24px; margin: 10px 0;">
+                    <span id="wifiIcon">📡</span>
+                </div>
+                <div style="font-size: 12px; color: #666;">
+                    Device: SK01_Client
+                </div>
+            </div>
+
+            <div class="last-update">
+                Last update: <span id="lastUpdate">--:--:--</span>
+            </div>
+        </div>
+
+        <div class="footer">
+            <button class="btn-refresh" onclick="manualRefresh()">⟳ Refresh Data</button>
+            <p style="margin-top: 15px;">Powered by ESP8266 | DHT22 | MQTT</p>
+        </div>
+    </div>
+
+    <script>
+        // MQTT Configuration
+        const mqttBroker = 'wss://broker.hivemq.com:8000/mqtt';
+        const topicSuhu = 'SK01/suhu';
+        const topicHum = 'SK01/kelembapan';
+        const topicStatus = 'SK01/status';
+
+        let client = null;
+        let lastData = {
+            suhu: null,
+            hum: null,
+            status: 'offline',
+            timestamp: null
+        };
+
+        // Connect to MQTT Broker
+        function connectMQTT() {
+            const options = {
+                clientId: 'web_' + Math.random().toString(16).substr(2, 8),
+                clean: true,
+                reconnectPeriod: 5000,
+                connectTimeout: 30000
+            };
+
+            client = mqtt.connect(mqttBroker, options);
+
+            client.on('connect', () => {
+                console.log('Connected to MQTT broker');
+                updateStatus('online', 'Online - Menerima data');
+                
+                // Subscribe to topics
+                client.subscribe([topicSuhu, topicHum, topicStatus], (err) => {
+                    if (!err) {
+                        console.log('Subscribed to all topics');
+                    } else {
+                        console.error('Subscribe error:', err);
+                    }
+                });
+            });
+
+            client.on('message', (topic, message) => {
+                const value = message.toString();
+                console.log(`Received: ${topic} = ${value}`);
+                
+                const now = new Date();
+                lastData.timestamp = now;
+                
+                switch(topic) {
+                    case topicSuhu:
+                        lastData.suhu = parseFloat(value).toFixed(1);
+                        document.getElementById('suhu').innerText = lastData.suhu;
+                        break;
+                    case topicHum:
+                        lastData.hum = parseFloat(value).toFixed(1);
+                        document.getElementById('hum').innerText = lastData.hum;
+                        break;
+                    case topicStatus:
+                        lastData.status = value;
+                        if (value === 'online') {
+                            updateStatus('online', 'Online - Device aktif');
+                        } else {
+                            updateStatus('offline', 'Offline - Device tidak aktif');
+                        }
+                        break;
+                }
+                
+                updateLastUpdate(now);
+                
+                // Tambahkan efek visual untuk update data
+                if (topic === topicSuhu || topic === topicHum) {
+                    const element = topic === topicSuhu ? 'suhu' : 'hum';
+                    const card = document.getElementById(element).parentElement.parentElement;
+                    card.style.transform = 'scale(1.02)';
+                    setTimeout(() => {
+                        card.style.transform = 'scale(1)';
+                    }, 300);
+                }
+            });
+
+            client.on('error', (err) => {
+                console.error('MQTT error:', err);
+                updateStatus('offline', 'Error - Mencoba menyambung ulang...');
+            });
+
+            client.on('close', () => {
+                console.log('MQTT connection closed');
+                updateStatus('offline', 'Terputus - Menyambung ulang...');
+            });
+        }
+
+        // Update status display
+        function updateStatus(status, text) {
+            const statusLed = document.getElementById('statusLed');
+            const statusText = document.getElementById('statusText');
+            const wifiIcon = document.getElementById('wifiIcon');
+            
+            if (status === 'online') {
+                statusLed.className = 'status-indicator status-online';
+                wifiIcon.innerHTML = '📶';
+            } else {
+                statusLed.className = 'status-indicator status-offline';
+                wifiIcon.innerHTML = '⚠️';
+            }
+            statusText.innerText = text;
+        }
+
+        // Update last update time
+        function updateLastUpdate(date) {
+            const time = date.toLocaleTimeString('id-ID');
+            const dateStr = date.toLocaleDateString('id-ID');
+            document.getElementById('lastUpdate').innerHTML = `${dateStr} ${time}`;
+        }
+
+        // Manual refresh - request latest data by publishing a status request
+        function manualRefresh() {
+            if (client && client.connected) {
+                // Publish status request (opsional - tergantung implementasi ESP)
+                client.publish('SK01/status/request', '1');
+                updateStatus('online', 'Meminta data terbaru...');
+                setTimeout(() => {
+                    if (lastData.status === 'online') {
+                        updateStatus('online', 'Online - Menerima data');
+                    }
+                }, 1000);
+            } else {
+                alert('MQTT tidak terhubung. Silakan refresh halaman.');
+                window.location.reload();
+            }
+        }
+
+        // Auto-refresh every 5 minutes (just in case)
+        setInterval(() => {
+            if (lastData.timestamp) {
+                const now = new Date();
+                const diff = (now - lastData.timestamp) / 1000;
+                if (diff > 60 && client && client.connected) {
+                    // If no data for 60 seconds, try to reconnect
+                    console.log('No data for 60 seconds, checking connection...');
+                    client.publish('SK01/status/request', '1');
+                }
+            }
+        }, 30000);
+
+        // Initialize
+        window.addEventListener('load', () => {
+            connectMQTT();
+            
+            // Set default value if no data after 10 seconds
+            setTimeout(() => {
+                if (!lastData.suhu) {
+                    document.getElementById('suhu').innerHTML = '--';
+                    document.getElementById('hum').innerHTML = '--';
+                    if (!client || !client.connected) {
+                        updateStatus('offline', 'Gagal terhubung - Periksa koneksi');
+                    }
+                }
+            }, 10000);
+        });
+
+        // Reconnect on page visibility change
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden && (!client || !client.connected)) {
+                console.log('Page visible, reconnecting...');
+                if (client) {
+                    client.end();
+                }
+                connectMQTT();
+            }
+        });
+    </script>
+</body>
+</html>
