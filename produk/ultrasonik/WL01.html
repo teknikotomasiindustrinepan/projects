@@ -41,6 +41,7 @@
         .header {
             text-align: center;
             margin-bottom: 20px;
+            position: relative;
         }
 
         .header h1 {
@@ -52,6 +53,46 @@
         .header p {
             color: #2c6e7e;
             font-size: 14px;
+        }
+
+        /* Tombol Kembali ke Dashboard */
+        .back-btn {
+            position: absolute;
+            left: 0;
+            top: 0;
+            background: rgba(26, 109, 124, 0.9);
+            color: white;
+            border: none;
+            border-radius: 30px;
+            padding: 8px 18px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+            text-decoration: none;
+        }
+
+        .back-btn:hover {
+            background: #0e4d63;
+            transform: translateX(-3px);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        }
+
+        @media (max-width: 700px) {
+            .back-btn {
+                position: static;
+                margin-bottom: 15px;
+                display: inline-flex;
+            }
+            .header {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+            }
         }
 
         .sensor-grid {
@@ -272,6 +313,10 @@
 <body>
 <div class="container">
     <div class="card header">
+        <!-- Tombol Kembali ke Dashboard -->
+        <a href="https://teknikotomasiindustrinepan.github.io/projects/dashboard_all.html" class="back-btn" target="_self">
+            ← Kembali ke Dashboard
+        </a>
         <h1>📡 SP01 - Ultrasonic Water Controller</h1>
         <p>Pompa Otomatis berdasarkan Jarak | Sensor HC-SR04</p>
         <div style="margin-top: 10px;">
