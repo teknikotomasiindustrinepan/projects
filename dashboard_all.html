@@ -114,23 +114,6 @@
             color: #64748b;
             font-size: 0.85rem;
         }
-        .open-all-btn {
-            background: #27ae60;
-            border: none;
-            padding: 0.7rem 1.5rem;
-            border-radius: 2rem;
-            color: white;
-            font-weight: 600;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            transition: all 0.2s;
-        }
-        .open-all-btn:hover {
-            background: #1e8e4a;
-            transform: scale(0.98);
-        }
 
         /* Dashboard Grid */
         .dashboard-grid {
@@ -148,6 +131,7 @@
             transition: all 0.3s ease;
             display: flex;
             flex-direction: column;
+            cursor: pointer;
         }
         .dashboard-card:hover {
             transform: translateY(-5px);
@@ -185,7 +169,6 @@
             justify-content: center;
             position: relative;
             overflow: hidden;
-            cursor: pointer;
         }
         .dashboard-preview iframe {
             width: 100%;
@@ -199,7 +182,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0,0,0,0.5);
+            background: rgba(0,0,0,0.6);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -207,7 +190,7 @@
             transition: opacity 0.3s;
             cursor: pointer;
         }
-        .dashboard-preview:hover .preview-overlay {
+        .dashboard-card:hover .preview-overlay {
             opacity: 1;
         }
         .preview-overlay i {
@@ -221,42 +204,28 @@
             padding: 1rem;
             border-top: 1px solid #e2e8f0;
             display: flex;
-            justify-content: space-between;
+            justify-content: center;
             align-items: center;
-            gap: 0.5rem;
-            flex-wrap: wrap;
-        }
-        .dashboard-link {
-            flex: 1;
-            font-size: 0.7rem;
-            color: #64748b;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-        .dashboard-link a {
-            color: #2c7da0;
-            text-decoration: none;
-        }
-        .dashboard-link a:hover {
-            text-decoration: underline;
         }
         .btn-open {
             background: #2c7da0;
             border: none;
-            padding: 0.4rem 1rem;
-            border-radius: 1.5rem;
+            padding: 0.6rem 1.5rem;
+            border-radius: 2rem;
             color: white;
             cursor: pointer;
-            font-size: 0.75rem;
+            font-size: 0.85rem;
+            font-weight: 600;
             display: inline-flex;
             align-items: center;
-            gap: 0.4rem;
+            gap: 0.5rem;
             transition: all 0.2s;
+            width: 100%;
+            justify-content: center;
         }
         .btn-open:hover {
             background: #1f5e7a;
-            transform: scale(0.95);
+            transform: scale(0.98);
         }
 
         /* Loading State */
@@ -356,9 +325,6 @@
                 flex-direction: column;
                 text-align: center;
             }
-            .dashboard-link {
-                max-width: 150px;
-            }
         }
     </style>
 </head>
@@ -370,10 +336,10 @@
                     <i class="fas fa-chalkboard-user"></i>
                     Kumpulan Dashboard Saya
                 </h1>
-                <p>Semua dashboard yang tersedia dalam satu tempat</p>
+                <p>Klik pada kartu atau tombol buka untuk mengakses dashboard</p>
             </div>
             <div class="header-actions">
-                <button class="btn-back" onclick="window.location.href='dashboard_user.html'">
+                <button class="btn-back" onclick="window.location.href='user_dashboard.html'">
                     <i class="fas fa-arrow-left"></i> Kembali
                 </button>
                 <button class="btn-refresh" onclick="location.reload()">
@@ -422,7 +388,7 @@
             toast.style.display = 'block';
             setTimeout(() => {
                 toast.style.display = 'none';
-            }, 4000);
+            }, 3000);
         }
 
         function escapeHtml(str) {
@@ -433,6 +399,15 @@
                 if (m === '>') return '&gt;';
                 return m;
             });
+        }
+
+        // Navigasi ke link (ganti halaman aktif, bukan tab baru)
+        function navigateToLink(link) {
+            if (link && link.trim() !== '') {
+                window.location.href = link;
+            } else {
+                showToast('Link dashboard tidak tersedia', true);
+            }
         }
 
         async function loadUserDashboards(user) {
@@ -549,16 +524,13 @@
                             <i class="fas fa-chalkboard"></i> ${dashboardsList.length} Dashboard
                         </div>
                         <div class="stats-text">
-                            <i class="fas fa-info-circle"></i> Klik kartu untuk melihat preview, klik tombol buka untuk membuka di tab baru
+                            <i class="fas fa-info-circle"></i> Klik kartu atau tombol buka untuk mengakses dashboard
                         </div>
                     </div>
-                    <button class="open-all-btn" id="openAllBtn">
-                        <i class="fas fa-external-link-alt"></i> Buka Semua di Tab Baru
-                    </button>
                 </div>
                 <div class="dashboard-grid" id="dashboardGrid">
                     ${dashboardsList.map((dashboard, index) => `
-                        <div class="dashboard-card" data-index="${index}">
+                        <div class="dashboard-card" data-link="${escapeHtml(dashboard.link)}" data-name="${escapeHtml(dashboard.name)}">
                             <div class="dashboard-header">
                                 <div class="dashboard-title">
                                     <i class="fas fa-chart-line"></i>
@@ -566,7 +538,7 @@
                                 </div>
                                 <div class="dashboard-code">${escapeHtml(dashboard.code)}</div>
                             </div>
-                            <div class="dashboard-preview" data-link="${escapeHtml(dashboard.link)}">
+                            <div class="dashboard-preview">
                                 <iframe 
                                     src="${escapeHtml(dashboard.link)}" 
                                     title="${escapeHtml(dashboard.name)}"
@@ -577,14 +549,8 @@
                                 </div>
                             </div>
                             <div class="dashboard-info">
-                                <div class="dashboard-link">
-                                    <i class="fas fa-link"></i>
-                                    <a href="${escapeHtml(dashboard.link)}" target="_blank" rel="noopener noreferrer">
-                                        ${escapeHtml(dashboard.link.length > 50 ? dashboard.link.substring(0, 47) + '...' : dashboard.link)}
-                                    </a>
-                                </div>
                                 <button class="btn-open" data-link="${escapeHtml(dashboard.link)}">
-                                    <i class="fas fa-external-link-alt"></i> Buka
+                                    <i class="fas fa-external-link-alt"></i> Buka Dashboard
                                 </button>
                             </div>
                         </div>
@@ -594,41 +560,30 @@
             
             contentDiv.innerHTML = statsHtml;
             
-            // Add event listeners for preview clicks
-            document.querySelectorAll('.dashboard-preview').forEach(preview => {
-                preview.addEventListener('click', () => {
-                    const link = preview.getAttribute('data-link');
-                    window.open(link, '_blank', 'noopener,noreferrer');
+            // Event listener untuk seluruh kartu (klik area mana saja)
+            document.querySelectorAll('.dashboard-card').forEach(card => {
+                card.addEventListener('click', (e) => {
+                    // Jangan trigger jika yang diklik adalah tombol (biar tombol handle sendiri)
+                    if (e.target.closest('.btn-open')) {
+                        return;
+                    }
+                    const link = card.getAttribute('data-link');
+                    if (link) {
+                        navigateToLink(link);
+                    }
                 });
             });
             
-            // Add event listeners for open buttons
+            // Event listener untuk tombol buka
             document.querySelectorAll('.btn-open').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     e.stopPropagation();
                     const link = btn.getAttribute('data-link');
-                    window.open(link, '_blank', 'noopener,noreferrer');
-                    showToast(`Membuka dashboard...`, false);
+                    if (link) {
+                        navigateToLink(link);
+                    }
                 });
             });
-            
-            // Add event listener for open all button
-            const openAllBtn = document.getElementById('openAllBtn');
-            if (openAllBtn) {
-                openAllBtn.addEventListener('click', () => {
-                    const totalDashboards = dashboardsList.length;
-                    let openedCount = 0;
-                    
-                    dashboardsList.forEach(dashboard => {
-                        if (dashboard.link) {
-                            window.open(dashboard.link, '_blank', 'noopener,noreferrer');
-                            openedCount++;
-                        }
-                    });
-                    
-                    showToast(`Membuka ${openedCount} dashboard di tab baru`, false);
-                });
-            }
         }
 
         // Check authentication
