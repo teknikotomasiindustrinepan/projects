@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>User Dashboard | Produk Saya</title>
+    <!-- Firebase SDK v9 -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
@@ -29,10 +30,8 @@
             justify-content: center;
             align-items: center;
             padding: 1.5rem;
-            overflow-x: hidden;
         }
 
-        /* Hapus overlay blur yang menyebabkan efek samping */
         body::before {
             content: '';
             position: fixed;
@@ -41,14 +40,8 @@
             width: 100%;
             height: 100%;
             background-color: rgba(0, 0, 0, 0.55);
-            /* Hapus backdrop-filter blur yang menyebabkan efek samping kanan */
-            /* backdrop-filter: blur(2px); */
+            backdrop-filter: blur(2px);
             z-index: 0;
-        }
-
-        html {
-            overflow-x: hidden;
-            max-width: 100%;
         }
 
         .container {
@@ -159,9 +152,69 @@
             word-break: break-all;
         }
 
-        /* SEMBUNYIKAN ACCESS CARD (TOMbol BUKA DASHBOARD) */
         .access-card {
-            display: none !important;
+            background: linear-gradient(135deg, #1f3b4c, #2c7da0);
+            border-radius: 1rem;
+            padding: 1rem 1.5rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+        .access-info {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+        .access-title {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: white;
+            font-weight: 600;
+        }
+        .access-title i {
+            font-size: 1.1rem;
+        }
+        .badge {
+            background: rgba(255,255,255,0.2);
+            border-radius: 2rem;
+            padding: 0.25rem 0.9rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: white;
+        }
+        .status-text {
+            font-size: 0.75rem;
+            color: rgba(255,255,255,0.8);
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+        .btn-primary {
+            background: #27ae60;
+            border: none;
+            padding: 0.6rem 1.3rem;
+            border-radius: 2rem;
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: white;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.2s;
+        }
+        .btn-primary:hover:not(:disabled) {
+            background: #1e8e4a;
+            transform: scale(0.98);
+        }
+        .btn-primary:disabled {
+            background: #94a3b8;
+            cursor: not-allowed;
         }
 
         .section-title {
@@ -473,6 +526,8 @@
             .card-header { padding: 1rem 1.2rem; }
             .card-header h1 { font-size: 1.3rem; }
             .card-content { padding: 1rem 1.2rem; }
+            .access-card { flex-direction: column; text-align: center; }
+            .access-info { justify-content: center; }
             
             .table-wrapper {
                 border: none;
@@ -557,6 +612,10 @@
         const newProductCodeInput = document.getElementById('newProductCode');
         const messageDiv = document.getElementById('message');
         const logoutBtn = document.getElementById('logoutBtn');
+        
+        const openAllDashboardBtn = document.getElementById('openAllDashboardBtn');
+        const dashboardCountSpan = document.getElementById('dashboardCount');
+        const dashboardStatusSpan = document.getElementById('dashboardStatus');
 
         let currentProductsData = [];
 
@@ -596,6 +655,38 @@
             }
         }
 
+        function updateDashboardButton() {
+            const activeDashboards = currentProductsData.filter(p => p.hasLink && p.link);
+            const count = activeDashboards.length;
+            
+            if (count === 0) {
+                openAllDashboardBtn.disabled = true;
+                dashboardCountSpan.textContent = '0';
+                dashboardStatusSpan.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Belum ada produk dengan link dashboard';
+                openAllDashboardBtn.style.opacity = '0.6';
+                openAllDashboardBtn.style.cursor = 'not-allowed';
+            } else {
+                openAllDashboardBtn.disabled = false;
+                dashboardCountSpan.textContent = count;
+                dashboardStatusSpan.innerHTML = `<i class="fas fa-check-circle"></i> ${count} dashboard siap ditampilkan`;
+                openAllDashboardBtn.style.opacity = '1';
+                openAllDashboardBtn.style.cursor = 'pointer';
+            }
+        }
+
+        // REDIRECT ke halaman dashboard_all.html di tab yang sama
+        function redirectToAllDashboards() {
+            const activeDashboards = currentProductsData.filter(p => p.hasLink && p.link);
+            
+            if (activeDashboards.length === 0) {
+                showMessage('Tidak ada dashboard yang tersedia. Tunggu admin menambahkan link untuk produk Anda.', true);
+                return;
+            }
+            
+            // Redirect ke halaman kumpulan dashboard di tab yang sama
+            window.location.href = 'dashboard_all.html';
+        }
+
         async function loadUserDashboard(user) {
             try {
                 const userDocRef = doc(db, "users", user.uid);
@@ -623,7 +714,8 @@
                 
                 productsTableBody.innerHTML = '';
                 if (products.length === 0) {
-                    productsTableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 2rem; color: #64748b;">Belum ada produk. Tambahkan menggunakan form di bawah.</td></tr>';
+                    productsTableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 2rem; color: #64748b;">Belum ada produk. Tambahkan menggunakan form di bawah.</table></td>';
+                    updateDashboardButton();
                 } else {
                     for (const code of products) {
                         const productDocRef = doc(db, "products", code);
@@ -666,15 +758,17 @@
                                         </div>
                                     </div>
                                 </div>
-                                </td>
+                               </td>
                             <td data-label="Kode Produk"><code class="product-code">${escapeHtml(product.code)}</code></td>
                             <td data-label="Status">${product.hasLink ? '<span class="status-active"><i class="fas fa-link"></i> Dashboard Tersedia</span>' : '<span class="status-pending"><i class="fas fa-clock"></i> Menunggu Link</span>'}</td>
                             <td data-label="Hapus">
                                 <button class="delete-product-btn" data-code="${escapeHtml(product.code)}" title="Hapus produk"><i class="fas fa-trash-alt"></i> Hapus</button>
-                              </td>
+                             </td>
                         `;
                         productsTableBody.appendChild(row);
                     }
+
+                    updateDashboardButton();
 
                     document.querySelectorAll('.delete-product-btn').forEach(btn => {
                         btn.addEventListener('click', async (e) => {
@@ -823,6 +917,11 @@
                 showMessage('Anda belum login', true);
             }
         });
+        
+        // Tombol redirect ke dashboard_all.html di tab yang sama
+        openAllDashboardBtn.addEventListener('click', () => {
+            redirectToAllDashboards();
+        });
     </script>
 </head>
 <body>
@@ -854,7 +953,23 @@
                         </div>
                     </div>
 
-                    <!-- ACCESS CARD TELAH DIHAPUS - TIDAK ADA TOMBOL BUKA DASHBOARD -->
+                    <div class="access-card">
+                        <div class="access-info">
+                            <div class="access-title">
+                                <i class="fas fa-tachometer-alt"></i>
+                                <span>Kumpulan Dashboard</span>
+                            </div>
+                            <div class="badge">
+                                <span id="dashboardCount">0</span> Dashboard Tersedia
+                            </div>
+                            <div class="status-text" id="dashboardStatus">
+                                <i class="fas fa-spinner fa-pulse"></i> Memuat...
+                            </div>
+                        </div>
+                        <button id="openAllDashboardBtn" class="btn-primary" disabled>
+                            <i class="fas fa-chalkboard"></i> Lihat Semua Dashboard
+                        </button>
+                    </div>
 
                     <div class="section-title">
                         <i class="fas fa-folder-open"></i>
@@ -875,7 +990,7 @@
                                 </tr>
                             </thead>
                             <tbody id="productsTableBody">
-                                <tr><td colspan="4" style="text-align: center; padding: 2rem;">Memuat...</td></tr>
+                                <tr><td colspan="4" style="text-align: center; padding: 2rem;">Memuat...</td</tr>
                             </tbody>
                         </table>
                     </div>
