@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>User Dashboard | Produk Saya</title>
-    <!-- Firebase SDK v9 -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
@@ -30,11 +29,10 @@
             justify-content: center;
             align-items: center;
             padding: 1.5rem;
-            /* Hapus overflow-x agar tidak ada scroll horizontal yang menyebabkan blur samping */
             overflow-x: hidden;
         }
 
-        /* Hapus pseudo-element yang menyebabkan blur berlebih di samping */
+        /* Hapus overlay blur yang menyebabkan efek samping */
         body::before {
             content: '';
             position: fixed;
@@ -43,8 +41,14 @@
             width: 100%;
             height: 100%;
             background-color: rgba(0, 0, 0, 0.55);
-            backdrop-filter: blur(2px);
+            /* Hapus backdrop-filter blur yang menyebabkan efek samping kanan */
+            /* backdrop-filter: blur(2px); */
             z-index: 0;
+        }
+
+        html {
+            overflow-x: hidden;
+            max-width: 100%;
         }
 
         .container {
@@ -155,7 +159,7 @@
             word-break: break-all;
         }
 
-        /* HAPUS SECTION access-card (tombol Buka Dashboard) - DISEMBUNYIKAN */
+        /* SEMBUNYIKAN ACCESS CARD (TOMbol BUKA DASHBOARD) */
         .access-card {
             display: none !important;
         }
@@ -462,12 +466,6 @@
 
         .hidden {
             display: none;
-        }
-
-        /* Perbaikan untuk memastikan tidak ada scroll horizontal berlebih */
-        html, body {
-            max-width: 100%;
-            overflow-x: hidden;
         }
 
         @media (max-width: 768px) {
@@ -856,7 +854,7 @@
                         </div>
                     </div>
 
-                    <!-- ACCESS CARD DIHAPUS / DISEMBUNYIKAN - TOMBOL BUKA DASHBOARD TIDAK MUNCUL -->
+                    <!-- ACCESS CARD TELAH DIHAPUS - TIDAK ADA TOMBOL BUKA DASHBOARD -->
 
                     <div class="section-title">
                         <i class="fas fa-folder-open"></i>
