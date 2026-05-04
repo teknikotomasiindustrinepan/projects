@@ -269,7 +269,6 @@
             padding: 2rem 1.5rem;
         }
 
-        /* Overlay semi-transparan untuk efek "invisible" agar tulisan tetap terbaca */
         body::before {
             content: '';
             position: fixed;
@@ -277,8 +276,8 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0, 0, 0, 0.55); /* Gelap 55% */
-            backdrop-filter: blur(2px); /* sedikit blur untuk mengurangi kontras background */
+            background-color: rgba(0, 0, 0, 0.55);
+            /* Hapus backdrop-filter: blur(2px); */
             z-index: -1;
         }
 
@@ -608,6 +607,11 @@
             .brand-title {
                 font-size: 2rem;
             }
+        }
+        
+        html, body {
+            overflow-x: hidden;
+            max-width: 100%;
         }
     </style>
 </head>
