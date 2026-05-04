@@ -1,239 +1,592 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Semua Dashboard</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Semua Dashboard | Kumpulan Dashboard Saya</title>
+    <!-- Firebase SDK v9 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+        body {
+            font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+            background: linear-gradient(135deg, #1a2a3a 0%, #0f1a24 100%);
+            min-height: 100vh;
+            position: relative;
+        }
 
-<style>
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #1f3b4c, #2c7da0);
+            padding: 1.5rem 2rem;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+        .logo h1 {
+            color: white;
+            font-size: 1.3rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        .logo p {
+            color: rgba(255,255,255,0.8);
+            font-size: 0.75rem;
+            margin-top: 0.25rem;
+        }
+        .header-actions {
+            display: flex;
+            gap: 1rem;
+        }
+        .btn-back, .btn-refresh {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            padding: 0.5rem 1.2rem;
+            border-radius: 2rem;
+            color: white;
+            cursor: pointer;
+            font-size: 0.85rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.2s;
+        }
+        .btn-back:hover, .btn-refresh:hover {
+            background: rgba(255,255,255,0.3);
+            transform: translateY(-2px);
+        }
 
-body {
-    font-family: 'Inter', sans-serif;
-    background: linear-gradient(135deg, #1a2a3a, #0f1a24);
-    min-height: 100vh;
-}
+        /* Container */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
 
-/* HEADER */
-.header {
-    background: linear-gradient(135deg, #1f3b4c, #2c7da0);
-    padding: 1.5rem;
-    color: white;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
+        /* Stats Card */
+        .stats-card {
+            background: white;
+            border-radius: 1rem;
+            padding: 1.2rem 1.5rem;
+            margin-bottom: 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .stats-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        .stats-badge {
+            background: #2c7da0;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 2rem;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+        .stats-text {
+            color: #64748b;
+            font-size: 0.85rem;
+        }
 
-.header h2 {
-    font-size: 1.2rem;
-}
+        /* Dashboard Grid */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+            gap: 1.5rem;
+        }
 
-.btn-back {
-    background: rgba(255,255,255,0.2);
-    border: none;
-    padding: 0.5rem 1rem;
-    border-radius: 2rem;
-    color: white;
-    cursor: pointer;
-}
+        /* Dashboard Card */
+        .dashboard-card {
+            background: white;
+            border-radius: 1rem;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            cursor: pointer;
+        }
+        .dashboard-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+        .dashboard-header {
+            background: linear-gradient(135deg, #1f3b4c, #2c7da0);
+            padding: 1rem 1.2rem;
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .dashboard-title {
+            font-weight: 600;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            word-break: break-word;
+            flex: 1;
+        }
+        .dashboard-code {
+            background: rgba(255,255,255,0.2);
+            padding: 0.2rem 0.6rem;
+            border-radius: 1rem;
+            font-size: 0.65rem;
+            font-family: monospace;
+        }
+        .dashboard-preview {
+            height: 200px;
+            background: #f1f5f9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .dashboard-preview iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            pointer-events: none;
+        }
+        .preview-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.3s;
+            cursor: pointer;
+        }
+        .dashboard-card:hover .preview-overlay {
+            opacity: 1;
+        }
+        .preview-overlay i {
+            font-size: 3rem;
+            color: white;
+            background: rgba(0,0,0,0.7);
+            padding: 1rem;
+            border-radius: 50%;
+        }
+        .dashboard-info {
+            padding: 1rem;
+            border-top: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .btn-open {
+            background: #2c7da0;
+            border: none;
+            padding: 0.6rem 1.5rem;
+            border-radius: 2rem;
+            color: white;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.2s;
+            width: 100%;
+            justify-content: center;
+        }
+        .btn-open:hover {
+            background: #1f5e7a;
+            transform: scale(0.98);
+        }
 
-/* CONTAINER */
-.container {
-    max-width: 1200px;
-    margin: auto;
-    padding: 1.5rem;
-}
+        /* Loading State */
+        .loading-state {
+            text-align: center;
+            padding: 4rem;
+            background: white;
+            border-radius: 1rem;
+        }
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid #e2e8f0;
+            border-top-color: #2c7da0;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
 
-/* GRID */
-.dashboard-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 1rem;
-}
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 4rem;
+            background: white;
+            border-radius: 1rem;
+        }
+        .empty-state i {
+            font-size: 4rem;
+            color: #cbd5e1;
+            margin-bottom: 1rem;
+        }
+        .empty-state p {
+            color: #64748b;
+            margin-bottom: 1.5rem;
+        }
+        .btn-go-back {
+            background: #2c7da0;
+            border: none;
+            padding: 0.7rem 1.5rem;
+            border-radius: 2rem;
+            color: white;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
 
-/* CARD */
-.dashboard-card {
-    background: white;
-    border-radius: 1rem;
-    padding: 1rem;
-    cursor: pointer;
-    transition: 0.2s;
-}
+        /* Toast Message */
+        .toast-message {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            padding: 0.75rem 1.5rem;
+            border-radius: 2rem;
+            font-size: 0.85rem;
+            z-index: 1000;
+            animation: slideIn 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(100px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        .toast-success {
+            background: #d1fae5;
+            color: #059669;
+            border-left: 4px solid #059669;
+        }
+        .toast-error {
+            background: #fee2e2;
+            color: #dc2626;
+            border-left: 4px solid #dc2626;
+        }
 
-.dashboard-card:hover {
-    transform: translateY(-5px);
-}
-
-/* HEADER CARD */
-.dashboard-header {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 1rem;
-}
-
-.dashboard-title {
-    font-weight: 600;
-    font-size: 0.95rem;
-}
-
-.dashboard-code {
-    font-size: 0.7rem;
-    background: #eee;
-    padding: 0.2rem 0.5rem;
-    border-radius: 1rem;
-}
-
-/* PREVIEW ICON */
-.dashboard-preview {
-    height: 120px;
-    background: #f1f5f9;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 0.5rem;
-    margin-bottom: 0.5rem;
-}
-
-.dashboard-preview i {
-    font-size: 2rem;
-    color: #94a3b8;
-}
-
-.dashboard-info {
-    text-align: center;
-    font-size: 0.75rem;
-    color: #64748b;
-}
-
-/* EMPTY */
-.empty {
-    text-align: center;
-    color: white;
-    margin-top: 2rem;
-}
-</style>
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+            .stats-card {
+                flex-direction: column;
+                text-align: center;
+            }
+            .header-content {
+                flex-direction: column;
+                text-align: center;
+            }
+        }
+    </style>
 </head>
-
 <body>
-
-<div class="header">
-    <h2><i class="fas fa-chart-line"></i> Semua Dashboard</h2>
-    <button class="btn-back" onclick="window.location.href='dashboard_user.html'">
-        <i class="fas fa-arrow-left"></i> Kembali
-    </button>
-</div>
-
-<div class="container">
-    <div id="content"></div>
-</div>
-
-<script type="module">
-
-// FIREBASE CONFIG
-const firebaseConfig = {
-    apiKey: "AIzaSyDrg1ltpGK_5Q85SDHVycSqMnaX1zYByLU",
-    authDomain: "toi-projects.firebaseapp.com",
-    projectId: "toi-projects"
-};
-
-import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
-import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
-import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
-
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-
-// NAVIGASI
-function navigateToLink(link) {
-    if (!auth.currentUser) {
-        alert("Silakan login terlebih dahulu");
-        window.location.href = "index.html";
-        return;
-    }
-    window.location.href = link;
-}
-
-// LOAD DATA
-async function loadData(user) {
-
-    const content = document.getElementById("content");
-    content.innerHTML = "<div class='empty'>Loading...</div>";
-
-    const userDoc = await getDoc(doc(db, "users", user.uid));
-
-    if (!userDoc.exists()) {
-        content.innerHTML = "<div class='empty'>Tidak ada data</div>";
-        return;
-    }
-
-    const data = userDoc.data();
-    const products = data.projects || [];
-
-    if (products.length === 0) {
-        content.innerHTML = "<div class='empty'>Belum ada dashboard</div>";
-        return;
-    }
-
-    let html = `<div class="dashboard-grid">`;
-
-    for (let code of products) {
-
-        const prod = await getDoc(doc(db, "products", code));
-        if (!prod.exists()) continue;
-
-        const p = prod.data();
-        if (!p.link) continue;
-
-        html += `
-        <div class="dashboard-card" data-link="${p.link}">
-            <div class="dashboard-header">
-                <div class="dashboard-title">${p.name || code}</div>
-                <div class="dashboard-code">${code}</div>
+    <div class="header">
+        <div class="header-content">
+            <div class="logo">
+                <h1>
+                    <i class="fas fa-chalkboard-user"></i>
+                    Kumpulan Dashboard Saya
+                </h1>
+                <p>Klik pada kartu atau tombol buka untuk mengakses dashboard</p>
             </div>
-
-            <div class="dashboard-preview">
-                <i class="fas fa-chart-line"></i>
-            </div>
-
-            <div class="dashboard-info">
-                Klik kartu untuk membuka dashboard
+            <div class="header-actions">
+                <button class="btn-back" onclick="window.location.href='dashboard_user.html'">
+                    <i class="fas fa-arrow-left"></i> Kembali
+                </button>
+                <button class="btn-refresh" onclick="location.reload()">
+                    <i class="fas fa-sync-alt"></i> Refresh
+                </button>
             </div>
         </div>
-        `;
-    }
+    </div>
 
-    html += `</div>`;
-    content.innerHTML = html;
+    <div class="container" id="container">
+        <div id="content">
+            <!-- Content will be loaded here -->
+        </div>
+    </div>
 
-    // CLICK CARD
-    document.querySelectorAll(".dashboard-card").forEach(card => {
-        card.addEventListener("click", () => {
-            const link = card.dataset.link;
-            if (link) {
-                navigateToLink(link);
+    <div id="toast" class="toast-message" style="display: none;"></div>
+
+    <script type="module">
+        // Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDrg1ltpGK_5Q85SDHVycSqMnaX1zYByLU",
+            authDomain: "toi-projects.firebaseapp.com",
+            projectId: "toi-projects",
+            storageBucket: "toi-projects.firebasestorage.app",
+            messagingSenderId: "676733316634",
+            appId: "1:676733316634:web:161451d5a16ab5346d6ba3"
+        };
+
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
+        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
+        import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        const ADMIN_EMAIL = "teknikotomasiindustri.nepan@gmail.com";
+
+        let currentUser = null;
+        let dashboards = [];
+
+        function showToast(message, isError = false) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = `toast-message ${isError ? 'toast-error' : 'toast-success'}`;
+            toast.style.display = 'block';
+            setTimeout(() => {
+                toast.style.display = 'none';
+            }, 3000);
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/[&<>]/g, function(m) {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                return m;
+            });
+        }
+
+        // Navigasi ke link (ganti halaman aktif, bukan tab baru)
+        function navigateToLink(link) {
+            if (link && link.trim() !== '') {
+                window.location.href = link;
+            } else {
+                showToast('Link dashboard tidak tersedia', true);
+            }
+        }
+
+        async function loadUserDashboards(user) {
+            const contentDiv = document.getElementById('content');
+            contentDiv.innerHTML = `
+                <div class="loading-state">
+                    <div class="loading-spinner"></div>
+                    <p>Memuat daftar dashboard...</p>
+                </div>
+            `;
+
+            try {
+                const userDocRef = doc(db, "users", user.uid);
+                const userSnap = await getDoc(userDocRef);
+                
+                if (!userSnap.exists()) {
+                    contentDiv.innerHTML = `
+                        <div class="empty-state">
+                            <i class="fas fa-folder-open"></i>
+                            <p>Anda belum memiliki produk</p>
+                            <button class="btn-go-back" onclick="window.location.href='user_dashboard.html'">
+                                <i class="fas fa-arrow-left"></i> Kembali ke Dashboard
+                            </button>
+                        </div>
+                    `;
+                    return;
+                }
+
+                const userData = userSnap.data();
+                const products = userData.projects || [];
+                const customNames = userData.projectCustomNames || {};
+
+                if (products.length === 0) {
+                    contentDiv.innerHTML = `
+                        <div class="empty-state">
+                            <i class="fas fa-folder-open"></i>
+                            <p>Anda belum memiliki produk</p>
+                            <button class="btn-go-back" onclick="window.location.href='user_dashboard.html'">
+                                <i class="fas fa-arrow-left"></i> Kembali ke Dashboard
+                            </button>
+                        </div>
+                    `;
+                    return;
+                }
+
+                // Load product details
+                const dashboardList = [];
+                for (const code of products) {
+                    const productDocRef = doc(db, "products", code);
+                    const productSnap = await getDoc(productDocRef);
+                    
+                    let defaultName = code;
+                    let link = null;
+                    
+                    if (productSnap.exists()) {
+                        defaultName = productSnap.data().name || code;
+                        link = productSnap.data().link || null;
+                    }
+                    
+                    const hasLink = link && link.trim() !== '';
+                    const displayName = customNames[code] ? customNames[code] : defaultName;
+                    
+                    dashboardList.push({
+                        code: code,
+                        name: displayName,
+                        originalName: defaultName,
+                        link: link,
+                        hasLink: hasLink
+                    });
+                }
+
+                // Filter hanya yang memiliki link
+                const activeDashboards = dashboardList.filter(d => d.hasLink);
+                dashboards = activeDashboards;
+
+                if (activeDashboards.length === 0) {
+                    contentDiv.innerHTML = `
+                        <div class="empty-state">
+                            <i class="fas fa-chart-line"></i>
+                            <p>Belum ada dashboard yang tersedia. Admin akan menambahkan link dashboard untuk produk Anda.</p>
+                            <button class="btn-go-back" onclick="window.location.href='user_dashboard.html'">
+                                <i class="fas fa-arrow-left"></i> Kembali ke Dashboard
+                            </button>
+                        </div>
+                    `;
+                    return;
+                }
+
+                // Render dashboard grid
+                renderDashboardGrid(activeDashboards);
+                
+            } catch (error) {
+                console.error(error);
+                contentDiv.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <p>Gagal memuat data: ${error.message}</p>
+                        <button class="btn-go-back" onclick="location.reload()">
+                            <i class="fas fa-sync-alt"></i> Coba Lagi
+                        </button>
+                    </div>
+                `;
+                showToast(`Gagal memuat data: ${error.message}`, true);
+            }
+        }
+
+        function renderDashboardGrid(dashboardsList) {
+            const contentDiv = document.getElementById('content');
+            
+            const statsHtml = `
+                <div class="stats-card">
+                    <div class="stats-info">
+                        <div class="stats-badge">
+                            <i class="fas fa-chalkboard"></i> ${dashboardsList.length} Dashboard
+                        </div>
+                        <div class="stats-text">
+                            <i class="fas fa-info-circle"></i> Klik kartu atau tombol buka untuk mengakses dashboard
+                        </div>
+                    </div>
+                </div>
+                <div class="dashboard-grid" id="dashboardGrid">
+                    ${dashboardsList.map((dashboard, index) => `
+                        <div class="dashboard-card" data-link="${escapeHtml(dashboard.link)}" data-name="${escapeHtml(dashboard.name)}">
+                            <div class="dashboard-header">
+                                <div class="dashboard-title">
+                                    <i class="fas fa-chart-line"></i>
+                                    ${escapeHtml(dashboard.name)}
+                                </div>
+                                <div class="dashboard-code">${escapeHtml(dashboard.code)}</div>
+                            </div>
+                            <div class="dashboard-preview">
+                                <iframe 
+                                    src="${escapeHtml(dashboard.link)}" 
+                                    title="${escapeHtml(dashboard.name)}"
+                                    loading="lazy">
+                                </iframe>
+                                <div class="preview-overlay">
+                                    <i class="fas fa-eye"></i>
+                                </div>
+                            </div>
+                            <div class="dashboard-info">
+                                <small>Klik kartu untuk membuka dashboard</small>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+            
+            contentDiv.innerHTML = statsHtml;
+            
+            // Event listener untuk seluruh kartu (klik area mana saja)
+            document.querySelectorAll('.dashboard-card').forEach(card => {
+                card.addEventListener('click', (e) => {
+                    // Jangan trigger jika yang diklik adalah tombol (biar tombol handle sendiri)
+                    if (e.target.closest('.btn-open')) {
+                        return;
+                    }
+                    const link = card.getAttribute('data-link');
+                    if (link) {
+                        navigateToLink(link);
+                    }
+                });
+            });
+            
+         }
+
+        // Check authentication
+        onAuthStateChanged(auth, async (user) => {
+            if (user && user.email !== ADMIN_EMAIL) {
+                currentUser = user;
+                await loadUserDashboards(user);
+            } else if (user && user.email === ADMIN_EMAIL) {
+                // Admin tidak boleh akses halaman ini
+                window.location.href = 'dashboard_admin.html';
+            } else {
+                // Tidak login, redirect ke login
+                window.location.href = 'index.html';
             }
         });
-    });
-}
-
-// AUTH CHECK
-onAuthStateChanged(auth, user => {
-    if (!user) {
-        window.location.href = "index.html";
-    } else {
-        loadData(user);
-    }
-});
-
-</script>
-
+    </script>
 </body>
 </html>
