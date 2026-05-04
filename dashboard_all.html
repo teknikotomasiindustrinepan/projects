@@ -549,7 +549,9 @@
                                 </div>
                             </div>
                             <div class="dashboard-info">
-                                <small>Klik kartu untuk membuka dashboard</small>
+                                <button class="btn-open" data-link="${escapeHtml(dashboard.link)}">
+                                    <i class="fas fa-external-link-alt"></i> Buka Dashboard
+                                </button>
                             </div>
                         </div>
                     `).join('')}
@@ -572,7 +574,17 @@
                 });
             });
             
-         }
+            // Event listener untuk tombol buka
+            document.querySelectorAll('.btn-open').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const link = btn.getAttribute('data-link');
+                    if (link) {
+                        navigateToLink(link);
+                    }
+                });
+            });
+        }
 
         // Check authentication
         onAuthStateChanged(auth, async (user) => {
